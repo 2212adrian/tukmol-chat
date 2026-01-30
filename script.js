@@ -891,15 +891,40 @@ function initializeApp() {
   }
 
   function showEmojiSuggestions(filterText, colonIndex) {
+    Toastify({
+      text: '6',
+      duration: 3000,
+      gravity: 'top',
+      position: 'right',
+      close: true,
+      stopOnFocus: true,
+      style: { background: '#000000' },
+    }).showToast();
     if (!emojiSuggestionsEl) return;
-
+    Toastify({
+      text: '7',
+      duration: 3000,
+      gravity: 'top',
+      position: 'right',
+      close: true,
+      stopOnFocus: true,
+      style: { background: '#000000' },
+    }).showToast();
     const matches = searchEmojiSuggestions(filterText);
 
     if (!matches.length) {
       hideEmojiSuggestions();
       return;
     }
-
+    Toastify({
+      text: '8',
+      duration: 3000,
+      gravity: 'top',
+      position: 'right',
+      close: true,
+      stopOnFocus: true,
+      style: { background: '#000000' },
+    }).showToast();
     emojiSuggestionsEl.innerHTML = '';
     matches.forEach((item) => {
       const btn = document.createElement('button');
@@ -921,6 +946,15 @@ function initializeApp() {
     });
 
     emojiSuggestionsEl.style.display = 'block';
+    Toastify({
+      text: '9',
+      duration: 3000,
+      gravity: 'top',
+      position: 'right',
+      close: true,
+      stopOnFocus: true,
+      style: { background: '#000000' },
+    }).showToast();
   }
 
   // === REALTIME SUBSCRIPTION ===
