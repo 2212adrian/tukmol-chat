@@ -271,16 +271,54 @@ function initializeApp() {
     }
 
     if (msg.image_url) {
-        const imgWrap = document.createElement('div');
-        imgWrap.className = 'message-image';
-        const img = document.createElement('img');
-        img.src = msg.image_url;
-        img.alt = 'Image';
-        img.loading = 'lazy';
-        img.onclick = () => window.open(msg.image_url, '_blank');
-        imgWrap.appendChild(img);
-        bubble.appendChild(imgWrap);
-    }
+  const imgWrap = document.createElement('div');
+  imgWrap.className = 'message-image';
+
+  const img = document.createElement('img');
+  img.src = msg.image_url;
+  img.alt = 'Image';
+  img.loading = 'lazy';
+  img.onclick = () => window.open(msg.image_url, '_blank');
+
+  // download icon button (top-right)
+  const downloadBtn = document.createElement('button');
+  downloadBtn.className = 'image-download-btn';
+  downloadBtn.type = 'button';
+  downloadBtn.innerHTML = '⬇'; // you can replace with an icon if using an icon font
+
+  downloadBtn.onclick = async (e) => {
+  e.stopPropagation(); // don't open image
+
+  try {
+    const response = await fetch(msg.image_url, { mode: 'cors' });
+    const blob = await response.blob();
+
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+
+    const url = new URL(msg.image_url, window.location.href);
+    const pathPart = url.pathname.split('/').pop() || 'image';
+    a.download = pathPart;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(blobUrl);
+  } catch (err) {
+    console.error('Download failed:', err);
+    showToast('Failed to download image.', 'error');
+  }
+};
+
+
+
+  imgWrap.appendChild(img);
+  imgWrap.appendChild(downloadBtn);
+  bubble.appendChild(imgWrap);
+}
+
 
     row.appendChild(bubble);
     messagesEl.appendChild(row);
