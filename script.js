@@ -1028,6 +1028,15 @@ function initializeApp() {
   let typingThrottle;
 
   messageInput.addEventListener('input', () => {
+    Toastify({
+      text: '1',
+      duration: 3000,
+      gravity: 'top',
+      position: 'right',
+      close: true,
+      stopOnFocus: true,
+      style: { background: '#000000' },
+    }).showToast();
     const hasText = messageInput.value.trim().length > 0;
 
     if (textFieldContainer) {
@@ -1086,23 +1095,57 @@ function initializeApp() {
     typingTimeout = setTimeout(() => {
       if (typingIndicator) typingIndicator.style.display = 'none';
     }, 1500);
-
+    Toastify({
+      text: '2',
+      duration: 3000,
+      gravity: 'top',
+      position: 'right',
+      close: true,
+      stopOnFocus: true,
+      style: { background: '#000000' },
+    }).showToast();
     if (!emojiSuggestionsEl) return;
     const value = messageInput.value;
     const cursorPos = messageInput.selectionStart || 0;
 
     const colonIndex = value.lastIndexOf(':', cursorPos - 1);
     if (colonIndex === -1) {
+      Toastify({
+        text: '3',
+        duration: 3000,
+        gravity: 'top',
+        position: 'right',
+        close: true,
+        stopOnFocus: true,
+        style: { background: '#000000' },
+      }).showToast();
       hideEmojiSuggestions();
       return;
     }
 
     const afterColon = value.slice(colonIndex + 1, cursorPos);
     if (afterColon.includes(' ') || afterColon.includes('\n')) {
+      Toastify({
+        text: '4',
+        duration: 3000,
+        gravity: 'top',
+        position: 'right',
+        close: true,
+        stopOnFocus: true,
+        style: { background: '#000000' },
+      }).showToast();
       hideEmojiSuggestions();
       return;
     }
-
+    Toastify({
+      text: '5',
+      duration: 3000,
+      gravity: 'top',
+      position: 'right',
+      close: true,
+      stopOnFocus: true,
+      style: { background: '#000000' },
+    }).showToast();
     showEmojiSuggestions(afterColon, colonIndex);
   });
 
