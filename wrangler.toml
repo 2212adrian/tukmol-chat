@@ -1,0 +1,11 @@
+name = "tropang-chat-upload"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[[r2_buckets]]
+binding = "CHAT_BUCKET"
+bucket_name = "tropang-chat-images"
+
+[vars]
+# simple shared secret for uploads
+UPLOAD_TOKEN = "super-secret-token-change-me"

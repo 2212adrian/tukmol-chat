@@ -33,7 +33,6 @@ loginForm.addEventListener('submit', async (e) => {
     if (data.session) {
       window.location.href = '/index.html';
     }
-
   } catch (err) {
     console.error('Login error:', err);
     errorMessage.textContent = err.message || 'Invalid email or password.';

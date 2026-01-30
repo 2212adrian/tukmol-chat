@@ -1,178 +1,240 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Tropang Tukmol</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tropang Tukmol</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
 
-  <!-- Animate.css -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-  <!-- Toastify CSS -->
-  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-  
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
+    <!-- Animate.css -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"
+    />
+    <!-- Toastify CSS -->
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+    <!-- Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
+    />
 
-  <!-- Main Container -->
-  <div class="app-layout" id="appLayout">
-    
-    <!-- SIDEBAR (Hidden behind Chat on Mobile Load) -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="user-welcome">
-          <small>Welcome back,</small>
-          <h3 id="sidebarUsername">User</h3>
-        </div>
-        <button id="logoutBtn" class="icon-btn-ghost" title="Logout">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-        </button>
-      </div>
-
-      <!-- Story/Contact Row -->
-      <div class="stories-container">
-        <div class="story-item">
-          <div class="story-ring add">+</div>
-          <span>Add</span>
-        </div>
-        <div class="story-item">
-           <img src="https://i.pravatar.cc/150?img=32" alt="User">
-           <span>Jane</span>
-        </div>
-        <div class="story-item">
-           <img src="https://i.pravatar.cc/150?img=12" alt="User">
-           <span>Mark</span>
-        </div>
-      </div>
-
-      <!-- Channel List -->
-      <div class="channel-list">
-        <div class="list-label">Channels</div>
-        
-        <div class="channel-item active" onclick="openChatMobile('General')">
-          <div class="avatar-box purple">#</div>
-          <div class="channel-info">
-            <h4>General</h4>
-            <p>Tropang Tukmol Main</p>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Main Container -->
+    <div class="app-layout" id="appLayout">
+      <!-- SIDEBAR (Hidden behind Chat on Mobile Load) -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="user-welcome">
+            <small>Welcome back,</small>
+            <h3 id="sidebarUsername">User</h3>
           </div>
-          <span class="time">Now</span>
-        </div>
-
-        <div class="channel-item" onclick="openChatMobile('Memes')">
-          <div class="avatar-box pink">#</div>
-          <div class="channel-info">
-            <h4>Memes</h4>
-            <p>Send funny stuff...</p>
-          </div>
-          <span class="time">2m</span>
-        </div>
-      </div>
-    </aside>
-
-    <!-- CHAT AREA (Visible on Mobile Load) -->
-    <main class="chat-area" id="chatArea">
-      
-      <!-- Chat Header -->
-      <header class="chat-header">
-        <div class="header-left">
-          <!-- Back Button: Hides Chat to reveal Sidebar -->
-          <button class="back-btn-mobile" id="mobileBackBtn" onclick="revealSidebar()">
-            <!-- Hamburger / Menu Icon or Back Arrow -->
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
+          <button id="logoutBtn" class="icon-btn-ghost" title="Logout">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
             </svg>
           </button>
-          
-          <div class="header-avatar">
-            <img src="https://ui-avatars.com/api/?name=General&background=6B4C9A&color=fff" alt="G">
+        </div>
+
+        <!-- Story/Contact Row -->
+        <div class="stories-container">
+          <div class="story-item">
+            <div class="story-ring add">+</div>
+            <span>Add</span>
           </div>
-          <div class="header-info">
-            <h2 id="roomNameHeader">General</h2>
-            <div class="status">
-              <span class="dot"></span> Online
+          <div class="story-item">
+            <img src="https://i.pravatar.cc/150?img=32" alt="User" />
+            <span>Jane</span>
+          </div>
+          <div class="story-item">
+            <img src="https://i.pravatar.cc/150?img=12" alt="User" />
+            <span>Mark</span>
+          </div>
+        </div>
+
+        <!-- Channel List -->
+        <div class="channel-list">
+          <div class="list-label">Channels</div>
+
+          <div class="channel-item active" onclick="openChatMobile('General')">
+            <div class="avatar-box purple">#</div>
+            <div class="channel-info">
+              <h4>General</h4>
+              <p>Tropang Tukmol Main</p>
+            </div>
+            <span class="time">Now</span>
+          </div>
+
+          <div class="channel-item" onclick="openChatMobile('Memes')">
+            <div class="avatar-box pink">#</div>
+            <div class="channel-info">
+              <h4>Memes</h4>
+              <p>Send funny stuff...</p>
+            </div>
+            <span class="time">2m</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CHAT AREA (Visible on Mobile Load) -->
+      <main class="chat-area" id="chatArea">
+        <!-- Chat Header -->
+        <header class="chat-header">
+          <div class="header-left">
+            <!-- Back Button: Hides Chat to reveal Sidebar -->
+            <button
+              class="back-btn-mobile"
+              id="mobileBackBtn"
+              onclick="revealSidebar()"
+            >
+              <!-- Hamburger / Menu Icon or Back Arrow -->
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </button>
+
+            <div class="header-avatar">
+              <img
+                src="https://ui-avatars.com/api/?name=General&background=6B4C9A&color=fff"
+                alt="G"
+              />
+            </div>
+            <div class="header-info">
+              <h2 id="roomNameHeader">General</h2>
+              <div class="status"><span class="dot"></span> Online</div>
             </div>
           </div>
-        </div>
-        <div class="header-right">
-          <button class="icon-btn-ghost" style="color:#555">
-             ⋮
-          </button>
-        </div>
-      </header>
-
-      <!-- Messages List -->
-      <div id="messages" class="messages-container">
-        <!-- Messages injected by JS -->
-      </div>
-
-      <!-- Typing Indicator -->
-      <div class="typing-indicator-box" id="typingIndicator">
-        <span>Someone is typing</span>
-        <div class="dots"><span></span><span></span><span></span></div>
-      </div>
-
-      <!-- Input Area -->
-      <div class="input-section">
-        <div class="input-wrapper">
-          <label for="imageInput" class="attach-btn">+</label>
-          <input type="file" id="imageInput" accept="image/*" hidden>
-
-          <div class="text-field-container">
-            <div id="inputLabel" class="edit-badge" style="display:none">Editing</div>
-            <input type="text" id="messageInput" placeholder="Message..." autocomplete="off">
-            <button id="emojiBtn" class="emoji-btn">😊</button>
+          <div class="header-right">
+            <button class="icon-btn-ghost" style="color: #555">⋮</button>
+            <button id="themeToggle">🌙</button>
           </div>
+        </header>
 
-          <button id="sendBtn" class="send-btn">
-             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
-          </button>
-          <button id="cancelEditBtn" class="cancel-edit-btn" style="display:none">✕</button>
+        <!-- Messages List -->
+        <div id="messages" class="messages-container">
+          <!-- Messages injected by JS -->
         </div>
-        <div class="file-preview" id="filePreview"></div>
-        <div id="emojiSuggestions" class="emoji-suggestions"></div>
-      </div>
 
-    </main>
-  </div>
+        <!-- Typing Indicator -->
+        <div class="typing-indicator-box" id="typingIndicator">
+          <span>Someone is typing</span>
+          <div class="dots"><span></span><span></span><span></span></div>
+        </div>
 
-  <!-- Scripts -->
-  <script src="https://unpkg.com/emoji-js@3.8.0/lib/emoji.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <script src="supabase-init.js"></script>
-  <script src="emojis.js"></script>
-  <script type="module" src="script.js"></script>
+        <!-- Input Area -->
+        <div id="newMessagesBtn" class="new-messages-btn">↓ New Messages</div>
+        <div class="input-section">
+          <div class="input-wrapper">
+            <label for="imageInput" class="attach-btn">+</label>
+            <input type="file" id="imageInput" accept="image/*" hidden />
 
-  <!-- Mobile Navigation Logic -->
-  <script>
-    // Function to slide Chat IN (Covering sidebar)
-    function openChatMobile(name) {
-      if (window.innerWidth <= 768) {
-        document.getElementById('appLayout').classList.add('mobile-chat-active');
-        if(name) {
-           document.getElementById('roomNameHeader').textContent = name.replace('#', '');
+            <div class="text-field-container">
+              <div id="inputLabel" class="edit-badge" style="display: none">
+                Editing
+              </div>
+              <input
+                type="text"
+                id="messageInput"
+                placeholder="Message..."
+                autocomplete="off"
+              />
+              <button id="emojiBtn" class="emoji-btn">😊</button>
+            </div>
+
+            <button id="sendBtn" class="send-btn">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+              </svg>
+            </button>
+            <button
+              id="cancelEditBtn"
+              class="cancel-edit-btn"
+              style="display: none"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="file-preview" id="filePreview"></div>
+          <div id="emojiSuggestions" class="emoji-suggestions"></div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/emoji-js@3.8.0/lib/emoji.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="supabase-init.js"></script>
+    <script src="emojis.js"></script>
+    <script type="module" src="script.js"></script>
+
+    <!-- Mobile Navigation Logic -->
+    <script>
+      // Function to slide Chat IN (Covering sidebar)
+      function openChatMobile(name) {
+        if (window.innerWidth <= 768) {
+          document
+            .getElementById('appLayout')
+            .classList.add('mobile-chat-active');
+          if (name) {
+            document.getElementById('roomNameHeader').textContent =
+              name.replace('#', '');
+          }
         }
       }
-    }
-    
-    // Function to slide Chat OUT (Revealing sidebar)
-    function revealSidebar() {
-      document.getElementById('appLayout').classList.remove('mobile-chat-active');
-    }
 
-    // AUTO-RUN ON LOAD
-    document.addEventListener('DOMContentLoaded', () => {
-      // If we are on mobile, automatically open the chat view
-      if (window.innerWidth <= 768) {
-        // We add the class immediately so the Sidebar is hidden by default
-        openChatMobile('General');
+      // Function to slide Chat OUT (Revealing sidebar)
+      function revealSidebar() {
+        document
+          .getElementById('appLayout')
+          .classList.remove('mobile-chat-active');
       }
-    });
-  </script>
-</body>
+
+      // AUTO-RUN ON LOAD
+      document.addEventListener('DOMContentLoaded', () => {
+        // If we are on mobile, automatically open the chat view
+        if (window.innerWidth <= 768) {
+          // We add the class immediately so the Sidebar is hidden by default
+          openChatMobile('General');
+        }
+      });
+    </script>
+  </body>
 </html>

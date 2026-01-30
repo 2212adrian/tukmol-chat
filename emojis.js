@@ -14,18 +14,16 @@ window.EMOJI_DICT = [];
 
     const rawList = await res.json(); // [{ code, emoji, description, keywords }, ...]
 
-    const dict = rawList.map(entry => {
+    const dict = rawList.map((entry) => {
       const desc = (entry.description || '').toLowerCase();
-      const snake = desc
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
+      const snake = desc.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
       const code = `:${snake}:`;
 
       return {
         code,
         emoji: entry.emoji,
         description: desc,
-        keywords: entry.keywords || []
+        keywords: entry.keywords || [],
       };
     });
 
@@ -33,25 +31,25 @@ window.EMOJI_DICT = [];
     const aliases = [
       { alias: ':smile:', target: '😀' }, // grinning face
       { alias: ':happy:', target: '😄' }, // grinning face with smiling eyes
-      { alias: ':lol:', target: '😂' },   // face with tears of joy
-      { alias: ':cry:', target: '😭' },   // loudly crying face
-      { alias: ':sad:', target: '😢' },   // crying face
-      { alias: ':love:', target: '😍' },  // smiling face with heart-eyes
+      { alias: ':lol:', target: '😂' }, // face with tears of joy
+      { alias: ':cry:', target: '😭' }, // loudly crying face
+      { alias: ':sad:', target: '😢' }, // crying face
+      { alias: ':love:', target: '😍' }, // smiling face with heart-eyes
       { alias: ':heart:', target: '❤️' },
       { alias: ':thumbsup:', target: '👍' },
       { alias: ':ok:', target: '👌' },
       { alias: ':fire:', target: '🔥' },
-      { alias: ':100:', target: '💯' }
+      { alias: ':100:', target: '💯' },
     ];
 
     aliases.forEach(({ alias, target }) => {
-      const found = dict.find(e => e.emoji === target);
+      const found = dict.find((e) => e.emoji === target);
       if (found) {
         dict.push({
           code: alias,
           emoji: found.emoji,
           description: found.description,
-          keywords: found.keywords
+          keywords: found.keywords,
         });
       }
     });

@@ -1,83 +1,428 @@
 [
-  { "code": "U+1F600", "emoji": "😀", "description": "GRINNING FACE", "keywords": ["face","grin","smile","happy"] },
-  { "code": "U+1F603", "emoji": "😃", "description": "GRINNING FACE WITH BIG EYES", "keywords": ["face","smile","happy"] },
-  { "code": "U+1F604", "emoji": "😄", "description": "GRINNING FACE WITH SMILING EYES", "keywords": ["face","smile","laugh","happy"] },
-  { "code": "U+1F601", "emoji": "😁", "description": "BEAMING FACE WITH SMILING EYES", "keywords": ["face","grin","happy"] },
-  { "code": "U+1F606", "emoji": "😆", "description": "GRINNING SQUINTING FACE", "keywords": ["face","laugh","lol","xD"] },
-  { "code": "U+1F605", "emoji": "😅", "description": "GRINNING FACE WITH SWEAT", "keywords": ["face","hot","sweat","nervous"] },
-  { "code": "U+1F602", "emoji": "😂", "description": "FACE WITH TEARS OF JOY", "keywords": ["face","tear","joy","lol","laugh","funny"] },
-  { "code": "U+1F923", "emoji": "🤣", "description": "ROLLING ON THE FLOOR LAUGHING", "keywords": ["rofl","laugh","lol","funny"] },
-  { "code": "U+1F642", "emoji": "🙂", "description": "SLIGHTLY SMILING FACE", "keywords": ["face","smile","soft"] },
-  { "code": "U+1F643", "emoji": "🙃", "description": "UPSIDE-DOWN FACE", "keywords": ["face","sarcasm","irony","joke"] },
-  { "code": "U+1F609", "emoji": "😉", "description": "WINKING FACE", "keywords": ["face","wink","flirt"] },
-  { "code": "U+1F60A", "emoji": "😊", "description": "SMILING FACE WITH SMILING EYES", "keywords": ["face","smile","blush","happy"] },
-  { "code": "U+1F607", "emoji": "😇", "description": "SMILING FACE WITH HALO", "keywords": ["angel","innocent","good"] },
+  {
+    "code": "U+1F600",
+    "emoji": "😀",
+    "description": "GRINNING FACE",
+    "keywords": ["face", "grin", "smile", "happy"]
+  },
+  {
+    "code": "U+1F603",
+    "emoji": "😃",
+    "description": "GRINNING FACE WITH BIG EYES",
+    "keywords": ["face", "smile", "happy"]
+  },
+  {
+    "code": "U+1F604",
+    "emoji": "😄",
+    "description": "GRINNING FACE WITH SMILING EYES",
+    "keywords": ["face", "smile", "laugh", "happy"]
+  },
+  {
+    "code": "U+1F601",
+    "emoji": "😁",
+    "description": "BEAMING FACE WITH SMILING EYES",
+    "keywords": ["face", "grin", "happy"]
+  },
+  {
+    "code": "U+1F606",
+    "emoji": "😆",
+    "description": "GRINNING SQUINTING FACE",
+    "keywords": ["face", "laugh", "lol", "xD"]
+  },
+  {
+    "code": "U+1F605",
+    "emoji": "😅",
+    "description": "GRINNING FACE WITH SWEAT",
+    "keywords": ["face", "hot", "sweat", "nervous"]
+  },
+  {
+    "code": "U+1F602",
+    "emoji": "😂",
+    "description": "FACE WITH TEARS OF JOY",
+    "keywords": ["face", "tear", "joy", "lol", "laugh", "funny"]
+  },
+  {
+    "code": "U+1F923",
+    "emoji": "🤣",
+    "description": "ROLLING ON THE FLOOR LAUGHING",
+    "keywords": ["rofl", "laugh", "lol", "funny"]
+  },
+  {
+    "code": "U+1F642",
+    "emoji": "🙂",
+    "description": "SLIGHTLY SMILING FACE",
+    "keywords": ["face", "smile", "soft"]
+  },
+  {
+    "code": "U+1F643",
+    "emoji": "🙃",
+    "description": "UPSIDE-DOWN FACE",
+    "keywords": ["face", "sarcasm", "irony", "joke"]
+  },
+  {
+    "code": "U+1F609",
+    "emoji": "😉",
+    "description": "WINKING FACE",
+    "keywords": ["face", "wink", "flirt"]
+  },
+  {
+    "code": "U+1F60A",
+    "emoji": "😊",
+    "description": "SMILING FACE WITH SMILING EYES",
+    "keywords": ["face", "smile", "blush", "happy"]
+  },
+  {
+    "code": "U+1F607",
+    "emoji": "😇",
+    "description": "SMILING FACE WITH HALO",
+    "keywords": ["angel", "innocent", "good"]
+  },
 
-  { "code": "U+1F970", "emoji": "🥰", "description": "SMILING FACE WITH HEARTS", "keywords": ["love","hearts","affection","crush"] },
-  { "code": "U+1F60D", "emoji": "😍", "description": "SMILING FACE WITH HEART-EYES", "keywords": ["love","heart","crush"] },
-  { "code": "U+1F618", "emoji": "😘", "description": "FACE BLOWING A KISS", "keywords": ["kiss","love"] },
-  { "code": "U+1F617", "emoji": "😗", "description": "KISSING FACE", "keywords": ["kiss","face"] },
-  { "code": "U+1F619", "emoji": "😙", "description": "KISSING FACE WITH SMILING EYES", "keywords": ["kiss","smile"] },
-  { "code": "U+1F61A", "emoji": "😚", "description": "KISSING FACE WITH CLOSED EYES", "keywords": ["kiss","closed","eyes"] },
+  {
+    "code": "U+1F970",
+    "emoji": "🥰",
+    "description": "SMILING FACE WITH HEARTS",
+    "keywords": ["love", "hearts", "affection", "crush"]
+  },
+  {
+    "code": "U+1F60D",
+    "emoji": "😍",
+    "description": "SMILING FACE WITH HEART-EYES",
+    "keywords": ["love", "heart", "crush"]
+  },
+  {
+    "code": "U+1F618",
+    "emoji": "😘",
+    "description": "FACE BLOWING A KISS",
+    "keywords": ["kiss", "love"]
+  },
+  {
+    "code": "U+1F617",
+    "emoji": "😗",
+    "description": "KISSING FACE",
+    "keywords": ["kiss", "face"]
+  },
+  {
+    "code": "U+1F619",
+    "emoji": "😙",
+    "description": "KISSING FACE WITH SMILING EYES",
+    "keywords": ["kiss", "smile"]
+  },
+  {
+    "code": "U+1F61A",
+    "emoji": "😚",
+    "description": "KISSING FACE WITH CLOSED EYES",
+    "keywords": ["kiss", "closed", "eyes"]
+  },
 
-  { "code": "U+1F600", "emoji": "😀", "description": "GRINNING FACE", "keywords": ["face","grin","happy"] },
-  { "code": "U+1F60B", "emoji": "😋", "description": "FACE SAVORING FOOD", "keywords": ["yum","food","tasty"] },
-  { "code": "U+1F61B", "emoji": "😛", "description": "FACE WITH TONGUE", "keywords": ["tongue","playful"] },
-  { "code": "U+1F61C", "emoji": "😜", "description": "WINKING FACE WITH TONGUE", "keywords": ["wink","tongue","joke"] },
-  { "code": "U+1F92A", "emoji": "🤪", "description": "ZANY FACE", "keywords": ["crazy","wacky","weird"] },
+  {
+    "code": "U+1F600",
+    "emoji": "😀",
+    "description": "GRINNING FACE",
+    "keywords": ["face", "grin", "happy"]
+  },
+  {
+    "code": "U+1F60B",
+    "emoji": "😋",
+    "description": "FACE SAVORING FOOD",
+    "keywords": ["yum", "food", "tasty"]
+  },
+  {
+    "code": "U+1F61B",
+    "emoji": "😛",
+    "description": "FACE WITH TONGUE",
+    "keywords": ["tongue", "playful"]
+  },
+  {
+    "code": "U+1F61C",
+    "emoji": "😜",
+    "description": "WINKING FACE WITH TONGUE",
+    "keywords": ["wink", "tongue", "joke"]
+  },
+  {
+    "code": "U+1F92A",
+    "emoji": "🤪",
+    "description": "ZANY FACE",
+    "keywords": ["crazy", "wacky", "weird"]
+  },
 
-  { "code": "U+1F60E", "emoji": "😎", "description": "SMILING FACE WITH SUNGLASSES", "keywords": ["cool","sunglasses"] },
-  { "code": "U+1F913", "emoji": "🤓", "description": "NERD FACE", "keywords": ["nerd","geek"] },
+  {
+    "code": "U+1F60E",
+    "emoji": "😎",
+    "description": "SMILING FACE WITH SUNGLASSES",
+    "keywords": ["cool", "sunglasses"]
+  },
+  {
+    "code": "U+1F913",
+    "emoji": "🤓",
+    "description": "NERD FACE",
+    "keywords": ["nerd", "geek"]
+  },
 
-  { "code": "U+1F60F", "emoji": "😏", "description": "SMIRKING FACE", "keywords": ["smirk","flirt","sly"] },
-  { "code": "U+1F612", "emoji": "😒", "description": "UNAMUSED FACE", "keywords": ["unamused","meh","annoyed"] },
-  { "code": "U+1F644", "emoji": "🙄", "description": "FACE WITH ROLLING EYES", "keywords": ["eyeroll","annoyed","sarcasm"] },
-  { "code": "U+1F62C", "emoji": "😬", "description": "GRIMACING FACE", "keywords": ["grimace","awkward"] },
+  {
+    "code": "U+1F60F",
+    "emoji": "😏",
+    "description": "SMIRKING FACE",
+    "keywords": ["smirk", "flirt", "sly"]
+  },
+  {
+    "code": "U+1F612",
+    "emoji": "😒",
+    "description": "UNAMUSED FACE",
+    "keywords": ["unamused", "meh", "annoyed"]
+  },
+  {
+    "code": "U+1F644",
+    "emoji": "🙄",
+    "description": "FACE WITH ROLLING EYES",
+    "keywords": ["eyeroll", "annoyed", "sarcasm"]
+  },
+  {
+    "code": "U+1F62C",
+    "emoji": "😬",
+    "description": "GRIMACING FACE",
+    "keywords": ["grimace", "awkward"]
+  },
 
-  { "code": "U+1F620", "emoji": "😠", "description": "ANGRY FACE", "keywords": ["angry","mad"] },
-  { "code": "U+1F621", "emoji": "😡", "description": "POUTING FACE", "keywords": ["pout","angry","mad"] },
-  { "code": "U+1F624", "emoji": "😤", "description": "FACE WITH STEAM FROM NOSE", "keywords": ["triumph","angry"] },
-  { "code": "U+1F92C", "emoji": "🤬", "description": "FACE WITH SYMBOLS ON MOUTH", "keywords": ["cursing","swear","angry"] },
+  {
+    "code": "U+1F620",
+    "emoji": "😠",
+    "description": "ANGRY FACE",
+    "keywords": ["angry", "mad"]
+  },
+  {
+    "code": "U+1F621",
+    "emoji": "😡",
+    "description": "POUTING FACE",
+    "keywords": ["pout", "angry", "mad"]
+  },
+  {
+    "code": "U+1F624",
+    "emoji": "😤",
+    "description": "FACE WITH STEAM FROM NOSE",
+    "keywords": ["triumph", "angry"]
+  },
+  {
+    "code": "U+1F92C",
+    "emoji": "🤬",
+    "description": "FACE WITH SYMBOLS ON MOUTH",
+    "keywords": ["cursing", "swear", "angry"]
+  },
 
-  { "code": "U+1F622", "emoji": "😢", "description": "CRYING FACE", "keywords": ["sad","cry"] },
-  { "code": "U+1F62D", "emoji": "😭", "description": "LOUDLY CRYING FACE", "keywords": ["sad","cry","sob"] },
-  { "code": "U+1F61E", "emoji": "😞", "description": "DISAPPOINTED FACE", "keywords": ["sad","disappointed"] },
-  { "code": "U+1F625", "emoji": "😥", "description": "SAD BUT RELIEVED FACE", "keywords": ["sad","relieved","nervous"] },
-  { "code": "U+1F614", "emoji": "😔", "description": "PENSIVE FACE", "keywords": ["sad","pensive","thoughtful"] },
-  { "code": "U+1F615", "emoji": "😕", "description": "CONFUSED FACE", "keywords": ["confused","unsure"] },
+  {
+    "code": "U+1F622",
+    "emoji": "😢",
+    "description": "CRYING FACE",
+    "keywords": ["sad", "cry"]
+  },
+  {
+    "code": "U+1F62D",
+    "emoji": "😭",
+    "description": "LOUDLY CRYING FACE",
+    "keywords": ["sad", "cry", "sob"]
+  },
+  {
+    "code": "U+1F61E",
+    "emoji": "😞",
+    "description": "DISAPPOINTED FACE",
+    "keywords": ["sad", "disappointed"]
+  },
+  {
+    "code": "U+1F625",
+    "emoji": "😥",
+    "description": "SAD BUT RELIEVED FACE",
+    "keywords": ["sad", "relieved", "nervous"]
+  },
+  {
+    "code": "U+1F614",
+    "emoji": "😔",
+    "description": "PENSIVE FACE",
+    "keywords": ["sad", "pensive", "thoughtful"]
+  },
+  {
+    "code": "U+1F615",
+    "emoji": "😕",
+    "description": "CONFUSED FACE",
+    "keywords": ["confused", "unsure"]
+  },
 
-  { "code": "U+1F641", "emoji": "🙁", "description": "SLIGHTLY FROWNING FACE", "keywords": ["frown","sad"] },
-  { "code": "U+1F623", "emoji": "😣", "description": "PERSEVERING FACE", "keywords": ["persevere","struggle"] },
-  { "code": "U+1F616", "emoji": "😖", "description": "CONFOUNDED FACE", "keywords": ["confounded","upset"] },
+  {
+    "code": "U+1F641",
+    "emoji": "🙁",
+    "description": "SLIGHTLY FROWNING FACE",
+    "keywords": ["frown", "sad"]
+  },
+  {
+    "code": "U+1F623",
+    "emoji": "😣",
+    "description": "PERSEVERING FACE",
+    "keywords": ["persevere", "struggle"]
+  },
+  {
+    "code": "U+1F616",
+    "emoji": "😖",
+    "description": "CONFOUNDED FACE",
+    "keywords": ["confounded", "upset"]
+  },
 
-  { "code": "U+1F97A", "emoji": "🥺", "description": "PLEADING FACE", "keywords": ["please","beg","puppy","eyes"] },
-  { "code": "U+1F61F", "emoji": "😟", "description": "WORRIED FACE", "keywords": ["worried","concerned"] },
+  {
+    "code": "U+1F97A",
+    "emoji": "🥺",
+    "description": "PLEADING FACE",
+    "keywords": ["please", "beg", "puppy", "eyes"]
+  },
+  {
+    "code": "U+1F61F",
+    "emoji": "😟",
+    "description": "WORRIED FACE",
+    "keywords": ["worried", "concerned"]
+  },
 
-  { "code": "U+1F632", "emoji": "😲", "description": "ASTONISHED FACE", "keywords": ["shock","surprised"] },
-  { "code": "U+1F62E", "emoji": "😮", "description": "FACE WITH OPEN MOUTH", "keywords": ["wow","surprised"] },
-  { "code": "U+1F634", "emoji": "😴", "description": "SLEEPING FACE", "keywords": ["sleep","tired"] },
-  { "code": "U+1F971", "emoji": "🥱", "description": "YAWNING FACE", "keywords": ["yawn","tired","sleepy"] },
+  {
+    "code": "U+1F632",
+    "emoji": "😲",
+    "description": "ASTONISHED FACE",
+    "keywords": ["shock", "surprised"]
+  },
+  {
+    "code": "U+1F62E",
+    "emoji": "😮",
+    "description": "FACE WITH OPEN MOUTH",
+    "keywords": ["wow", "surprised"]
+  },
+  {
+    "code": "U+1F634",
+    "emoji": "😴",
+    "description": "SLEEPING FACE",
+    "keywords": ["sleep", "tired"]
+  },
+  {
+    "code": "U+1F971",
+    "emoji": "🥱",
+    "description": "YAWNING FACE",
+    "keywords": ["yawn", "tired", "sleepy"]
+  },
 
-  { "code": "U+2764", "emoji": "❤️", "description": "RED HEART", "keywords": ["love","heart"] },
-  { "code": "U+1F9E1", "emoji": "🧡", "description": "ORANGE HEART", "keywords": ["heart","orange"] },
-  { "code": "U+1F49B", "emoji": "💛", "description": "YELLOW HEART", "keywords": ["heart","yellow"] },
-  { "code": "U+1F49A", "emoji": "💚", "description": "GREEN HEART", "keywords": ["heart","green"] },
-  { "code": "U+1F499", "emoji": "💙", "description": "BLUE HEART", "keywords": ["heart","blue"] },
-  { "code": "U+1F49C", "emoji": "💜", "description": "PURPLE HEART", "keywords": ["heart","purple"] },
-  { "code": "U+1F90E", "emoji": "🤎", "description": "BROWN HEART", "keywords": ["heart","brown"] },
-  { "code": "U+1F5A4", "emoji": "🖤", "description": "BLACK HEART", "keywords": ["heart","black"] },
-  { "code": "U+1F90D", "emoji": "🤍", "description": "WHITE HEART", "keywords": ["heart","white"] },
+  {
+    "code": "U+2764",
+    "emoji": "❤️",
+    "description": "RED HEART",
+    "keywords": ["love", "heart"]
+  },
+  {
+    "code": "U+1F9E1",
+    "emoji": "🧡",
+    "description": "ORANGE HEART",
+    "keywords": ["heart", "orange"]
+  },
+  {
+    "code": "U+1F49B",
+    "emoji": "💛",
+    "description": "YELLOW HEART",
+    "keywords": ["heart", "yellow"]
+  },
+  {
+    "code": "U+1F49A",
+    "emoji": "💚",
+    "description": "GREEN HEART",
+    "keywords": ["heart", "green"]
+  },
+  {
+    "code": "U+1F499",
+    "emoji": "💙",
+    "description": "BLUE HEART",
+    "keywords": ["heart", "blue"]
+  },
+  {
+    "code": "U+1F49C",
+    "emoji": "💜",
+    "description": "PURPLE HEART",
+    "keywords": ["heart", "purple"]
+  },
+  {
+    "code": "U+1F90E",
+    "emoji": "🤎",
+    "description": "BROWN HEART",
+    "keywords": ["heart", "brown"]
+  },
+  {
+    "code": "U+1F5A4",
+    "emoji": "🖤",
+    "description": "BLACK HEART",
+    "keywords": ["heart", "black"]
+  },
+  {
+    "code": "U+1F90D",
+    "emoji": "🤍",
+    "description": "WHITE HEART",
+    "keywords": ["heart", "white"]
+  },
 
-  { "code": "U+1F44D", "emoji": "👍", "description": "THUMBS UP", "keywords": ["thumb","ok","like","approve"] },
-  { "code": "U+1F44E", "emoji": "👎", "description": "THUMBS DOWN", "keywords": ["thumb","dislike"] },
-  { "code": "U+1F44C", "emoji": "👌", "description": "OK HAND", "keywords": ["ok","perfect"] },
-  { "code": "U+270C", "emoji": "✌️", "description": "VICTORY HAND", "keywords": ["peace","victory","v"] },
-  { "code": "U+1F44F", "emoji": "👏", "description": "CLAPPING HANDS", "keywords": ["clap","applause"] },
-  { "code": "U+1F64C", "emoji": "🙌", "description": "RAISING HANDS", "keywords": ["praise","yay"] },
-  { "code": "U+1F44B", "emoji": "👋", "description": "WAVING HAND", "keywords": ["hello","hi","bye"] },
+  {
+    "code": "U+1F44D",
+    "emoji": "👍",
+    "description": "THUMBS UP",
+    "keywords": ["thumb", "ok", "like", "approve"]
+  },
+  {
+    "code": "U+1F44E",
+    "emoji": "👎",
+    "description": "THUMBS DOWN",
+    "keywords": ["thumb", "dislike"]
+  },
+  {
+    "code": "U+1F44C",
+    "emoji": "👌",
+    "description": "OK HAND",
+    "keywords": ["ok", "perfect"]
+  },
+  {
+    "code": "U+270C",
+    "emoji": "✌️",
+    "description": "VICTORY HAND",
+    "keywords": ["peace", "victory", "v"]
+  },
+  {
+    "code": "U+1F44F",
+    "emoji": "👏",
+    "description": "CLAPPING HANDS",
+    "keywords": ["clap", "applause"]
+  },
+  {
+    "code": "U+1F64C",
+    "emoji": "🙌",
+    "description": "RAISING HANDS",
+    "keywords": ["praise", "yay"]
+  },
+  {
+    "code": "U+1F44B",
+    "emoji": "👋",
+    "description": "WAVING HAND",
+    "keywords": ["hello", "hi", "bye"]
+  },
 
-  { "code": "U+1F525", "emoji": "🔥", "description": "FIRE", "keywords": ["fire","lit","hot"] },
-  { "code": "U+1F4AF", "emoji": "💯", "description": "HUNDRED POINTS", "keywords": ["100","perfect","score"] },
-  { "code": "U+1F389", "emoji": "🎉", "description": "PARTY POPPER", "keywords": ["party","celebration"] },
-  { "code": "U+1F381", "emoji": "🎁", "description": "WRAPPED GIFT", "keywords": ["gift","present"] }
+  {
+    "code": "U+1F525",
+    "emoji": "🔥",
+    "description": "FIRE",
+    "keywords": ["fire", "lit", "hot"]
+  },
+  {
+    "code": "U+1F4AF",
+    "emoji": "💯",
+    "description": "HUNDRED POINTS",
+    "keywords": ["100", "perfect", "score"]
+  },
+  {
+    "code": "U+1F389",
+    "emoji": "🎉",
+    "description": "PARTY POPPER",
+    "keywords": ["party", "celebration"]
+  },
+  {
+    "code": "U+1F381",
+    "emoji": "🎁",
+    "description": "WRAPPED GIFT",
+    "keywords": ["gift", "present"]
+  }
 ]
