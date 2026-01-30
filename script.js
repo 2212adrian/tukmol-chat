@@ -6,6 +6,7 @@ import { EmojiButton } from 'https://cdn.jsdelivr.net/npm/@joeattardi/emoji-butt
 // === GLOBAL VARIABLES ===
 let session = null;
 const MESSAGE_REACTIONS = {};
+const REACTION_EVENT = 'reaction';
 // === AUTHENTICATION & SESSION CHECK ===
 // This block runs immediately to protect the page
 (async () => {
@@ -50,6 +51,9 @@ function initializeApp() {
     if (!supabase2) {
     console.error('Supabase client not found. Make sure supabase-init.js runs BEFORE this script.');
     }
+
+    CURRENT_USERNAME = session.user.email;
+if (currentUsernameEl) currentUsernameEl.textContent = CURRENT_USERNAME;
 
     // === DOM ELEMENTS ===
     const messagesEl = document.getElementById('messages');
@@ -209,121 +213,129 @@ function initializeApp() {
 
     // === RENDER MESSAGE ===
     function renderMessage(msg) {
-    console.log('[Chat] Rendering message:', msg);
+  console.log('[Chat] Rendering message:', msg);
 
-    const welcome = messagesEl.querySelector('.welcome-message');
-    if (welcome) welcome.remove();
+  const welcome = messagesEl.querySelector('.welcome-message');
+  if (welcome) welcome.remove();
 
-    const isMe = msg.user_name === session.user.email;
+  const isMe = msg.user_name === session.user.email;
 
-    const row = document.createElement('div');
-    row.className = 'message-row ' + (isMe ? 'me' : 'other');
-    row.dataset.messageId = msg.id;
-    row.dataset.createdAt = msg.created_at;
+  const row = document.createElement('div');
+  row.className = 'message-row ' + (isMe ? 'me' : 'other');
+  row.dataset.messageId = msg.id;
+  row.dataset.createdAt = msg.created_at;
 
-    const bubble = document.createElement('div');
-    bubble.className = 'message-bubble';
+  const bubble = document.createElement('div');
+  bubble.className = 'message-bubble';
 
-    const header = document.createElement('div');
-    header.className = 'message-header';
+  const header = document.createElement('div');
+  header.className = 'message-header';
 
-    const meta = document.createElement('div');
-    meta.className = 'message-meta';
+  const meta = document.createElement('div');
+  meta.className = 'message-meta';
 
-    const usernameSpan = document.createElement('span');
-    usernameSpan.className = 'message-username';
-    usernameSpan.textContent = msg.user_name || 'Unknown';
+  const usernameSpan = document.createElement('span');
+  usernameSpan.className = 'message-username';
+  usernameSpan.textContent = msg.user_name || 'Unknown';
 
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'message-time';
-    timeSpan.textContent = formatTime(msg.created_at);
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'message-time';
+  timeSpan.textContent = formatTime(msg.created_at);
 
-    meta.appendChild(usernameSpan);
-    meta.appendChild(timeSpan);
-    header.appendChild(meta);
+  meta.appendChild(usernameSpan);
+  meta.appendChild(timeSpan);
+  header.appendChild(meta);
 
-    const actions = document.createElement('div');
-    actions.className = 'message-actions';
+  const actions = document.createElement('div');
+  actions.className = 'message-actions';
 
-    if (isMe) {
-        const editBtn = document.createElement('button');
-        editBtn.className = 'message-action-btn edit-btn';
-        editBtn.textContent = '✏';
-        editBtn.onclick = () => editMessage(msg);
+  if (isMe) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'message-action-btn edit-btn';
+    editBtn.textContent = '✏';
+    editBtn.onclick = () => editMessage(msg);
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'message-action-btn delete-btn';
-        deleteBtn.textContent = '🗑';
-        deleteBtn.onclick = () => deleteMessage(msg);
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'message-action-btn delete-btn';
+    deleteBtn.textContent = '🗑';
+    deleteBtn.onclick = () => deleteMessage(msg);
 
-        actions.appendChild(editBtn);
-        actions.appendChild(deleteBtn);
-    }
-
-    header.appendChild(actions);
-    bubble.appendChild(header);
-
-    if (msg.content) {
-        const textEl = document.createElement('div');
-        textEl.className = 'message-text';
-        textEl.innerHTML = escapeHtml(msg.content);
-        bubble.appendChild(textEl);
-    }
-
-    if (msg.image_url) {
-  const imgWrap = document.createElement('div');
-  imgWrap.className = 'message-image';
-
-  const img = document.createElement('img');
-  img.src = msg.image_url;
-  img.alt = 'Image';
-  img.loading = 'lazy';
-  img.onclick = () => window.open(msg.image_url, '_blank');
-
-  // download icon button (top-right)
-  const downloadBtn = document.createElement('button');
-  downloadBtn.className = 'image-download-btn';
-  downloadBtn.type = 'button';
-  downloadBtn.innerHTML = '⬇'; // you can replace with an icon if using an icon font
-
-  downloadBtn.onclick = async (e) => {
-  e.stopPropagation(); // don't open image
-
-  try {
-    const response = await fetch(msg.image_url, { mode: 'cors' });
-    const blob = await response.blob();
-
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-
-    const url = new URL(msg.image_url, window.location.href);
-    const pathPart = url.pathname.split('/').pop() || 'image';
-    a.download = pathPart;
-
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    URL.revokeObjectURL(blobUrl);
-  } catch (err) {
-    console.error('Download failed:', err);
-    showToast('Failed to download image.', 'error');
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
   }
-};
 
+  header.appendChild(actions);
+  bubble.appendChild(header);
 
+  if (msg.content) {
+    const textEl = document.createElement('div');
+    textEl.className = 'message-text';
+    textEl.innerHTML = escapeHtml(msg.content);
+    bubble.appendChild(textEl);
+  }
 
-  imgWrap.appendChild(img);
-  imgWrap.appendChild(downloadBtn);
-  bubble.appendChild(imgWrap);
+  if (msg.image_url) {
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'message-image';
+
+    const img = document.createElement('img');
+    img.src = msg.image_url;
+    img.alt = 'Image';
+    img.loading = 'lazy';
+    img.onclick = () => window.open(msg.image_url, '_blank');
+
+    // download icon button (top-right)
+    const downloadBtn = document.createElement('button');
+    downloadBtn.className = 'image-download-btn';
+    downloadBtn.type = 'button';
+    downloadBtn.innerHTML = '⬇'; // replace with icon if desired
+
+    downloadBtn.onclick = async (e) => {
+      e.stopPropagation(); // don't open image
+
+      try {
+        const response = await fetch(msg.image_url, { mode: 'cors' });
+        const blob = await response.blob();
+
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+
+        const url = new URL(msg.image_url, window.location.href);
+        const pathPart = url.pathname.split('/').pop() || 'image';
+        a.download = pathPart;
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        console.error('Download failed:', err);
+        showToast('Failed to download image.', 'error');
+      }
+    };
+
+    imgWrap.appendChild(img);
+    imgWrap.appendChild(downloadBtn);
+    bubble.appendChild(imgWrap);
+  }
+
+  // Reaction bar container (bottom-left, outside bubble)
+  const reactionBar = document.createElement('div');
+  reactionBar.className = 'reaction-bar';
+  reactionBar.dataset.messageId = msg.id;
+
+  // Render initial reactions (if any)
+  renderReactionBarForMessage(msg.id, reactionBar);
+
+  row.appendChild(bubble);
+  row.appendChild(reactionBar);
+
+  messagesEl.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-
-    row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
 
     // === LOAD INITIAL MESSAGES ===
     async function loadMessages() {
@@ -420,6 +432,126 @@ function subscribeRealtime() {
       console.log('Broadcast status:', status);
     });
 }
+
+async function toggleReaction(messageId, emoji) {
+  if (!supabase2) return;
+
+  const existingMap = MESSAGE_REACTIONS[messageId] || {};
+  const bucket = existingMap[emoji];
+  const userAlreadyReacted = bucket && bucket.users.includes(CURRENT_USERNAME);
+
+  try {
+    if (!userAlreadyReacted) {
+      const { error } = await supabase2
+        .from('message_reactions')
+        .insert({
+          message_id: messageId,
+          user_name: CURRENT_USERNAME,
+          emoji,
+        });
+
+      if (error) throw error;
+
+      await chatChannel.send({
+        type: 'broadcast',
+        event: REACTION_EVENT,
+        payload: {
+          message_id: messageId,
+          user_name: CURRENT_USERNAME,
+          emoji,
+          action: 'add',
+        },
+      });
+    } else {
+      const { error } = await supabase2
+        .from('message_reactions')
+        .delete()
+        .eq('message_id', messageId)
+        .eq('user_name', CURRENT_USERNAME)
+        .eq('emoji', emoji);
+
+      if (error) throw error;
+
+      await chatChannel.send({
+        type: 'broadcast',
+        event: REACTION_EVENT,
+        payload: {
+          message_id: messageId,
+          user_name: CURRENT_USERNAME,
+          emoji,
+          action: 'remove',
+        },
+      });
+    }
+  } catch (err) {
+    console.error('Reaction toggle error:', err);
+    showToast('Failed to update reaction.', 'error');
+  }
+}
+
+
+function renderReactionBarForMessage(messageId, containerEl) {
+  containerEl.innerHTML = '';
+
+  const map = MESSAGE_REACTIONS[messageId] || {};
+
+  const reactBtn = document.createElement('button');
+  reactBtn.type = 'button';
+  reactBtn.className = 'react-main-btn';
+  reactBtn.textContent = '🙂 React';
+
+  reactBtn.onclick = (e) => {
+    e.stopPropagation();
+    openReactionPicker(messageId, containerEl);
+  };
+
+  containerEl.appendChild(reactBtn);
+
+  Object.entries(map).forEach(([emoji, info]) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'reaction-chip';
+    chip.textContent = `${emoji} ${info.count}`;
+    chip.title = info.users.join(', ') || 'No reactions';
+
+    chip.onclick = (e) => {
+      e.stopPropagation();
+      toggleReaction(messageId, emoji);
+    };
+
+    containerEl.appendChild(chip);
+  });
+}
+
+
+function openReactionPicker(messageId, containerEl) {
+  const existing = containerEl.querySelector('.reaction-picker-popup');
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const popup = document.createElement('div');
+  popup.className = 'reaction-picker-popup';
+
+  const emojis = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+  emojis.forEach(e => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'reaction-picker-item';
+    btn.textContent = e;
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      toggleReaction(messageId, e);
+      popup.remove();
+    };
+    popup.appendChild(btn);
+  });
+
+  containerEl.appendChild(popup);
+}
+
+
 
 function applyReactionToCacheAndUI(r) {
   const { message_id, user_name, emoji, action } = r;

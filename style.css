@@ -312,55 +312,101 @@ body {
    ========================================= */
 
 @media (max-width: 768px) {
-  /* Remove desktop rounding for full screen feel */
   .app-layout {
-    border-radius: 0;
-    max-height: none;
-    height: 100dvh;
-    box-shadow: none;
+    border-radius: 0; max-height: none; height: 100dvh; box-shadow: none;
   }
 
-  /* 
-     Mobile Navigation Strategy:
-     Sidebar and ChatArea are stacked.
-     Sidebar is visible by default.
-     ChatArea is pushed off-screen to the right.
-  */
-
+  /* SIDEBAR: Always 'behind' the chat on Z-axis, but logically first */
   .sidebar {
-    width: 100%;
-    position: absolute;
-    top: 0; left: 0; bottom: 0;
+    width: 100%; position: absolute; top: 0; left: 0; bottom: 0;
     z-index: 5;
-    /* When chat is open, sidebar stays but chat covers it */
   }
 
+  /* CHAT AREA: slides over the sidebar */
   .chat-area {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     z-index: 10;
-    transform: translateX(100%); /* Hidden to the right */
+    /* Default State (Hidden to right) - BUT JS will override this on load */
+    transform: translateX(100%);
     transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
   }
 
-  /* When the class 'mobile-chat-active' is added to app-layout */
+  /* Active State (Chat Visible) */
   .app-layout.mobile-chat-active .chat-area {
-    transform: translateX(0); /* Slide in */
+    transform: translateX(0);
   }
 
-  /* Show Back Button on Mobile */
   .back-btn-mobile { display: block; }
-  
-  /* Adjust header padding for mobile */
-  .chat-header { padding: 10px 15px; }
-  .sidebar { padding: 20px 15px; }
-
-  /* Adjust Bubble Size for narrow screens */
   .message-bubble { max-width: 80%; }
-  
-  /* Input Area adjustments */
-  .input-section { padding: 8px 10px; padding-bottom: max(8px, var(--safe-bottom)); }
-  .text-field-container { padding: 4px 12px; }
-  .attach-btn { width: 34px; height: 34px; font-size: 24px; }
-  .send-btn { width: 38px; height: 38px; }
+}
+
+.reaction-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  margin-left: 4px;
+  font-size: 12px;
+}
+
+/* hide entire bar by default */
+.message-row .reaction-bar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+/* show when message row is hovered */
+.message-row:hover .reaction-bar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.react-main-btn {
+  border: none;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.react-main-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.reaction-chip {
+  border: none;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #eee;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.reaction-chip:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.reaction-picker-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #222;
+  display: flex;
+  gap: 4px;
+  z-index: 5;
+}
+
+.reaction-picker-item {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
 }
