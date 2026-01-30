@@ -72,6 +72,7 @@ function initializeApp() {
 
   if (!messagesEl || !messageInput || !sendBtn) {
     console.error('Required chat DOM elements not found.');
+    logError('Required chat DOM elements not found.', err);
     return;
   }
 
