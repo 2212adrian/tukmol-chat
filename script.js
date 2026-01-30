@@ -5,7 +5,7 @@ import { EmojiButton } from 'https://cdn.jsdelivr.net/npm/@joeattardi/emoji-butt
 
 // === GLOBAL VARIABLES ===
 let session = null;
-
+const MESSAGE_REACTIONS = {};
 // === AUTHENTICATION & SESSION CHECK ===
 // This block runs immediately to protect the page
 (async () => {
@@ -327,57 +327,139 @@ function initializeApp() {
 
     // === LOAD INITIAL MESSAGES ===
     async function loadMessages() {
-    if (!supabase2) return;
-    try {
-        console.log('[Chat] Loading messages for room:', ROOM_NAME);
+  if (!supabase2) return;
+  try {
+    console.log('[Chat] Loading messages for room:', ROOM_NAME);
 
-        const { data, error } = await supabase2
-        .from('messages')
+    const { data, error } = await supabase2
+      .from('messages')
+      .select('*')
+      .eq('room_name', ROOM_NAME)
+      .order('created_at', { ascending: true })
+      .limit(200);
+
+    console.log('[Chat] loadMessages result:', { data, error });
+
+    if (error) throw error;
+
+    const messages = data || [];
+
+    // Load reactions for these messages
+    const ids = messages.map(m => m.id);
+    if (ids.length) {
+      const { data: reactionsData, error: reactionsError } = await supabase2
+        .from('message_reactions')
         .select('*')
-        .eq('room_name', ROOM_NAME)
-        .order('created_at', { ascending: true })
-        .limit(200);
+        .in('message_id', ids);
 
-        console.log('[Chat] loadMessages result:', { data, error });
+      if (reactionsError) {
+        console.error('Load reactions error:', reactionsError);
+      } else {
+        buildReactionsCache(reactionsData || []);
+      }
+    }
 
-        if (error) throw error;
-        (data || []).forEach(renderMessage);
-    } catch (err) {
-        console.error('Load messages error:', err);
-        showToast('Failed to load messages.', 'error');
+    messages.forEach(renderMessage);
+  } catch (err) {
+    console.error('Load messages error:', err);
+    showToast('Failed to load messages.', 'error');
+  }
+}
+
+function buildReactionsCache(rows) {
+  for (const r of rows) {
+    if (!MESSAGE_REACTIONS[r.message_id]) {
+      MESSAGE_REACTIONS[r.message_id] = {};
     }
+    if (!MESSAGE_REACTIONS[r.message_id][r.emoji]) {
+      MESSAGE_REACTIONS[r.message_id][r.emoji] = { count: 0, users: [] };
     }
+    const bucket = MESSAGE_REACTIONS[r.message_id][r.emoji];
+    if (!bucket.users.includes(r.user_name)) {
+      bucket.users.push(r.user_name);
+      bucket.count += 1;
+    }
+  }
+}
+
 
     // === REALTIME SUBSCRIPTION ===
-    function subscribeRealtime() {
-    if (!supabase2) return;
+    const REACTION_EVENT = 'reaction';
 
-    console.log('[Chat] Subscribing to broadcast channel...');
-    chatChannel
-        // messages
-        .on('broadcast', { event: 'message' }, (payload) => {
-        console.log('[Chat] Broadcast received (message):', payload);
-        const msg = payload.payload;
-        renderMessage(msg);
-        })
-        // typing indicator
-        .on('broadcast', { event: TYPING_EVENT }, (payload) => {
-        const { username, isTyping } = payload.payload || {};
-        if (!typingIndicator) return;
+function subscribeRealtime() {
+  if (!supabase2) return;
 
-        // only show if someone else is typing
-        if (username && username !== session.user.email && isTyping) {
-            const span = typingIndicator.querySelector('span');
-            if (span) span.textContent = `${username} is typing`;
-            typingIndicator.style.display = 'inline-flex';
-        } else {
-            typingIndicator.style.display = 'none';
-        }
-        })
-        .subscribe((status) => {
-        console.log('Broadcast status:', status);
-        });
+  console.log('[Chat] Subscribing to broadcast channel...');
+  chatChannel
+    // messages
+    .on('broadcast', { event: 'message' }, (payload) => {
+      console.log('[Chat] Broadcast received (message):', payload);
+      const msg = payload.payload;
+      renderMessage(msg);
+    })
+    // typing indicator (already present)
+    .on('broadcast', { event: TYPING_EVENT }, (payload) => {
+      const { username, isTyping } = payload.payload || {};
+      if (!typingIndicator) return;
+
+      if (username && username !== CURRENT_USERNAME && isTyping) {
+        const span = typingIndicator.querySelector('span');
+        if (span) span.textContent = `${username} is typing`;
+        typingIndicator.style.display = 'inline-flex';
+      } else {
+        typingIndicator.style.display = 'none';
+      }
+    })
+    // reactions
+    .on('broadcast', { event: REACTION_EVENT }, (payload) => {
+      const reaction = payload.payload;
+      console.log('[Chat] Broadcast received (reaction):', reaction);
+      applyReactionToCacheAndUI(reaction);
+    })
+    .subscribe((status) => {
+      console.log('Broadcast status:', status);
+    });
+}
+
+function applyReactionToCacheAndUI(r) {
+  const { message_id, user_name, emoji, action } = r;
+  if (!MESSAGE_REACTIONS[message_id]) {
+    MESSAGE_REACTIONS[message_id] = {};
+  }
+  const map = MESSAGE_REACTIONS[message_id];
+
+  if (!map[emoji]) {
+    map[emoji] = { count: 0, users: [] };
+  }
+  const bucket = map[emoji];
+
+  if (action === 'add') {
+    if (!bucket.users.includes(user_name)) {
+      bucket.users.push(user_name);
+      bucket.count += 1;
     }
+  } else if (action === 'remove') {
+    const idx = bucket.users.indexOf(user_name);
+    if (idx !== -1) {
+      bucket.users.splice(idx, 1);
+      bucket.count = Math.max(0, bucket.count - 1);
+    }
+    if (bucket.count === 0) {
+      delete map[emoji];
+    }
+  }
+
+  // Re-render reaction bar for this message
+  const row = messagesEl.querySelector(`[data-message-id="${message_id}"]`);
+  if (row) {
+    const bar = row.querySelector('.reaction-bar');
+    if (bar) {
+      renderReactionBarForMessage(message_id, bar);
+    }
+  }
+}
+
+
 
     // === EDIT / DELETE FUNCTIONS ===
     async function editMessage(msg) {

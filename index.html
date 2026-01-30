@@ -2,101 +2,166 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Tropang Tukmol Chat</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tropang Tukmol</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
   <!-- Animate.css -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"
-  />
-
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
   <!-- Toastify CSS -->
-  <link rel="stylesheet" type="text/css"
-        href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-
-  <!-- Your styles -->
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="chat-container">
-    <div class="chat-header">
-      <div class="chat-title">
-        Tropang Tukmol
-        <span class="room-pill">#general</span>
-      </div>
-      <div class="user-pill" id="currentUserPill">
-        You: <span id="currentUsername"></span>
-      </div>
-      <button class="icon-btn" id="logoutBtn" title="Logout" style="width: auto; padding: 0 12px; font-size: 13px; font-weight: 500;">Logout</button>
-    </div>
 
-    <div id="messages" class="messages">
-      <div class="welcome-message animate__animated animate__fadeIn">
-        <p>Welcome to Tropang Tukmol 👋</p>
-        <p>Type a message or send an image to start the chika!</p>
-      </div>
-    </div>
-
-    <div class="input-area">
-      <!-- Small label above input (will change to "Edit message" in edit mode) -->
-      <div class="input-label" id="inputLabel">Write a message</div>
-
-      <div class="input-wrapper">
-        <!-- Left: upload (+) -->
-        <label for="imageInput" class="icon-btn icon-btn-left" title="Upload image">
-          +
-        </label>
-
-        <!-- Center: message box -->
-        <input
-          type="text"
-          id="messageInput"
-          placeholder="Write a message..."
-          maxlength="500"
-          autocomplete="off"
-        >
-
-        <!-- Emoji button -->
-        <button type="button" class="icon-btn emoji-btn" id="emojiBtn" title="Insert emoji">😊</button>
-
-        <!-- Cancel edit button (hidden when not editing) -->
-        <button type="button" class="icon-btn cancel-edit-btn"
-                id="cancelEditBtn" title="Cancel edit" style="display:none;">✕</button>
-
-        <!-- Right: send (return / check) -->
-        <button class="icon-btn icon-btn-right" id="sendBtn" title="Send message">
-          <span id="sendIcon">↵</span>
+  <!-- Main Container -->
+  <div class="app-layout" id="appLayout">
+    
+    <!-- SIDEBAR (Screen 1 on Mobile) -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="user-welcome">
+          <small>Welcome back,</small>
+          <h3 id="sidebarUsername">User</h3>
+        </div>
+        <button id="logoutBtn" class="icon-btn-ghost" title="Logout">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
         </button>
       </div>
 
-      <!-- Hidden file input -->
-      <input type="file" id="imageInput" accept="image/*" style="display:none">
-
-      <div class="file-preview" id="filePreview"></div>
-      <div id="emojiSuggestions" class="emoji-suggestions"></div>
-      <div class="typing-indicator" id="typingIndicator">
-        <span>Someone is typing</span>
-        <div class="typing-dots">
-          <span></span><span></span><span></span>
+      <!-- Story/Contact Row -->
+      <div class="stories-container">
+        <div class="story-item">
+          <div class="story-ring add">+</div>
+          <span>Add</span>
+        </div>
+        <div class="story-item">
+           <img src="https://i.pravatar.cc/150?img=32" alt="User">
+           <span>Jane</span>
+        </div>
+        <div class="story-item">
+           <img src="https://i.pravatar.cc/150?img=12" alt="User">
+           <span>Mark</span>
+        </div>
+        <div class="story-item">
+           <img src="https://i.pravatar.cc/150?img=5" alt="User">
+           <span>Sarah</span>
         </div>
       </div>
-    </div>
+
+      <!-- Channel List -->
+      <div class="channel-list">
+        <div class="list-label">Channels</div>
+        
+        <!-- Clicking this opens Chat on mobile -->
+        <div class="channel-item active" onclick="openChatMobile('#general')">
+          <div class="avatar-box purple">#</div>
+          <div class="channel-info">
+            <h4>General</h4>
+            <p>Tropang Tukmol Main</p>
+          </div>
+          <span class="time">Now</span>
+        </div>
+
+        <div class="channel-item" onclick="openChatMobile('#memes')">
+          <div class="avatar-box pink">#</div>
+          <div class="channel-info">
+            <h4>Memes</h4>
+            <p>Send funny stuff...</p>
+          </div>
+          <span class="time">2m</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CHAT AREA (Screen 2 on Mobile) -->
+    <main class="chat-area" id="chatArea">
+      
+      <!-- Chat Header -->
+      <header class="chat-header">
+        <div class="header-left">
+          <!-- Back Button (Visible only on Mobile) -->
+          <button class="back-btn-mobile" id="mobileBackBtn" onclick="closeChatMobile()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          
+          <div class="header-avatar">
+            <img src="https://ui-avatars.com/api/?name=General&background=6B4C9A&color=fff" alt="G">
+          </div>
+          <div class="header-info">
+            <h2 id="roomNameHeader">General</h2>
+            <div class="status">
+              <span class="dot"></span> Online
+            </div>
+          </div>
+        </div>
+        <div class="header-right">
+          <button class="icon-btn-ghost">
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Messages List -->
+      <div id="messages" class="messages-container">
+        <!-- Messages injected by JS -->
+      </div>
+
+      <!-- Typing Indicator -->
+      <div class="typing-indicator-box" id="typingIndicator">
+        <span>Someone is typing</span>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="input-section">
+        <div class="input-wrapper">
+          <label for="imageInput" class="attach-btn">+</label>
+          <input type="file" id="imageInput" accept="image/*" hidden>
+
+          <div class="text-field-container">
+            <div id="inputLabel" class="edit-badge" style="display:none">Editing</div>
+            <input type="text" id="messageInput" placeholder="Message..." autocomplete="off">
+            <button id="emojiBtn" class="emoji-btn">😊</button>
+          </div>
+
+          <button id="sendBtn" class="send-btn">
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+          </button>
+          
+          <button id="cancelEditBtn" class="cancel-edit-btn" style="display:none">✕</button>
+        </div>
+        <div class="file-preview" id="filePreview"></div>
+        <div id="emojiSuggestions" class="emoji-suggestions"></div>
+      </div>
+
+    </main>
   </div>
 
-   <script src="https://unpkg.com/emoji-js@3.8.0/lib/emoji.min.js"></script>
-
-  <!-- Toastify JS -->
+  <!-- Scripts -->
+  <script src="https://unpkg.com/emoji-js@3.8.0/lib/emoji.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-
-  <!-- Emoji Button UMD (window.EmojiButton) -->
   <script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.umd.min.js"></script>
- 
-
-  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <script src="supabase-init.js"></script>
   <script src="emojis.js"></script>
-   <script type="module" src="script.js"></script>
+  <script type="module" src="script.js"></script>
+
+  <!-- Mobile Navigation Logic -->
+  <script>
+    function openChatMobile(name) {
+      if (window.innerWidth <= 768) {
+        document.getElementById('appLayout').classList.add('mobile-chat-active');
+        document.getElementById('roomNameHeader').textContent = name.replace('#', '');
+      }
+    }
+    
+    function closeChatMobile() {
+      document.getElementById('appLayout').classList.remove('mobile-chat-active');
+    }
+  </script>
 </body>
 </html>
