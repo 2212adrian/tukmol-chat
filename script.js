@@ -1,4 +1,8 @@
+// script.js (ES module)
 'use strict';
+
+// Import EmojiButton from CDN ES module build
+import { EmojiButton } from 'https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js';
 
 const ROOM_NAME = 'Tropang Tukmol';
 let CURRENT_USERNAME = 'Adrian';
@@ -27,6 +31,11 @@ if (currentUsernameEl) currentUsernameEl.textContent = CURRENT_USERNAME;
 
 // edit state
 let editingMessage = null;
+
+// typing state (for broadcast)
+let typingTimeout;
+let typingTimeoutLocal = null;
+const TYPING_EVENT = 'typing';
 
 // === BROADCAST CHANNEL (single instance) ===
 console.log('[Chat] Creating channel for room:', ROOM_NAME);
@@ -74,13 +83,52 @@ function showToast(text, type = 'info') {
   }).showToast();
 }
 
+// === ANTI-SPAM ===
+let sendTimestamps = []; // store recent message times (ms)
+let isSendBlocked = false;
+let sendBlockUntil = 0;
+
+function canSendNow() {
+  const now = Date.now();
+
+  // still blocked?
+  if (isSendBlocked && now < sendBlockUntil) {
+    const remaining = Math.ceil((sendBlockUntil - now) / 1000);
+    showToast(`You are sending messages too quickly. Wait ${remaining}s.`, 'warning');
+    return false;
+  }
+
+  // unblock if time passed
+  if (isSendBlocked && now >= sendBlockUntil) {
+    isSendBlocked = false;
+    sendTimestamps = [];
+  }
+
+  // record this attempt first
+  sendTimestamps.push(now);
+
+  // keep only last 1 second of history
+  const WINDOW_MS = 1000;
+  sendTimestamps = sendTimestamps.filter(t => now - t <= WINDOW_MS);
+
+  // if 5 or more messages in that window, block for 10 seconds
+  const LIMIT = 5;
+  if (sendTimestamps.length >= LIMIT) {
+    isSendBlocked = true;
+    sendBlockUntil = now + 10000; // 10 seconds
+    showToast('You are sending messages too fast. Blocked for 10 seconds.', 'warning');
+    return false;
+  }
+
+  return true;
+}
+
 // === EMOJI DICTIONARY UTILITIES (from emojis.js) ===
 const EMOJI_DICT = window.EMOJI_DICT || [];
+console.log('[Emoji] EMOJI_DICT size at script.js:', EMOJI_DICT.length);
 
 // Replace any :short_code: in text with the emoji character
 function replaceShortcodesWithEmoji(text) {
-    console.log('[Emoji] EMOJI_DICT size:', EMOJI_DICT.length);
-
   if (!text || !EMOJI_DICT.length) return text || '';
 
   return text.replace(/:([a-zA-Z0-9_+-]+):/g, (match) => {
@@ -98,7 +146,7 @@ function convertShortcodesToEmoji(text) {
 // Simple suggestion search: match on code, description, or keywords
 function searchEmojiSuggestions(query) {
   if (!EMOJI_DICT.length) return [];
-  if (!query) return EMOJI_DICT.slice(0, 20);
+  if (!query) return EMOJI_DICT.slice(0, 20); // show first 20 on plain ":"
   const q = query.toLowerCase();
   return EMOJI_DICT.filter(e => {
     if (e.code && e.code.toLowerCase().includes(q)) return true;
@@ -230,10 +278,25 @@ function subscribeRealtime() {
 
   console.log('[Chat] Subscribing to broadcast channel...');
   chatChannel
+    // messages
     .on('broadcast', { event: 'message' }, (payload) => {
-      console.log('[Chat] Broadcast received:', payload);
+      console.log('[Chat] Broadcast received (message):', payload);
       const msg = payload.payload;
       renderMessage(msg);
+    })
+    // typing indicator
+    .on('broadcast', { event: TYPING_EVENT }, (payload) => {
+      const { username, isTyping } = payload.payload || {};
+      if (!typingIndicator) return;
+
+      // only show if someone else is typing
+      if (username && username !== CURRENT_USERNAME && isTyping) {
+        const span = typingIndicator.querySelector('span');
+        if (span) span.textContent = `${username} is typing`;
+        typingIndicator.style.display = 'inline-flex';
+      } else {
+        typingIndicator.style.display = 'none';
+      }
     })
     .subscribe((status) => {
       console.log('Broadcast status:', status);
@@ -297,6 +360,7 @@ async function deleteMessage(msg) {
 // === SEND MESSAGE (create or edit) ===
 async function sendMessage() {
   if (!supabase2) return;
+  if (!canSendNow()) return;
 
   const rawText = messageInput.value.trim();
   const file = imageInput.files[0];
@@ -465,8 +529,8 @@ function showEmojiSuggestions(filterText, colonIndex) {
   emojiSuggestionsEl.style.display = 'block';
 }
 
-// === EMOJI PICKER (EmojiButton) ===
-if (window.EmojiButton && emojiBtn) {
+// === EMOJI PICKER (EmojiButton, ES module) ===
+if (emojiBtn) {
   const picker = new EmojiButton({
     position: 'top-end',
     autoHide: true,
@@ -489,7 +553,7 @@ if (window.EmojiButton && emojiBtn) {
     picker.togglePicker(emojiBtn);
   });
 } else {
-  console.warn('EmojiButton not available or emojiBtn not found.');
+  console.warn('emojiBtn not found.');
 }
 
 // === EVENTS ===
@@ -532,12 +596,41 @@ imageInput.addEventListener('change', () => {
   }
 });
 
-let typingTimeout;
+// typing + emoji suggestions
 messageInput.addEventListener('input', () => {
-  typingIndicator.style.display = 'inline-flex';
+  // Do not show typing indicator for myself; instead, broadcast to others
+  if (chatChannel) {
+    chatChannel.send({
+      type: 'broadcast',
+      event: TYPING_EVENT,
+      payload: {
+        username: CURRENT_USERNAME,
+        isTyping: true,
+      },
+    });
+  }
+
+  clearTimeout(typingTimeoutLocal);
+  typingTimeoutLocal = setTimeout(() => {
+    if (chatChannel) {
+      chatChannel.send({
+        type: 'broadcast',
+        event: TYPING_EVENT,
+        payload: {
+          username: CURRENT_USERNAME,
+          isTyping: false,
+        },
+      });
+    }
+  }, 1500);
+
+  // existing local timeout still used only to hide if somehow shown
+  if (typingIndicator) {
+    typingIndicator.style.display = 'none';
+  }
   clearTimeout(typingTimeout);
   typingTimeout = setTimeout(() => {
-    typingIndicator.style.display = 'none';
+    if (typingIndicator) typingIndicator.style.display = 'none';
   }, 1500);
 
   if (!emojiSuggestionsEl) return;
@@ -558,7 +651,6 @@ messageInput.addEventListener('input', () => {
 
   showEmojiSuggestions(afterColon, colonIndex);
 });
-
 
 // === INIT ===
 console.log('[Chat] Initializing chat page...');
