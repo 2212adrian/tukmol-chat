@@ -3,6 +3,9 @@
 
 import { EmojiButton } from 'https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js';
 
+// === GLOBAL VARIABLES ===
+let session = null;
+
 // === AUTHENTICATION & SESSION CHECK ===
 // This block runs immediately to protect the page
 (async () => {
@@ -12,7 +15,8 @@ import { EmojiButton } from 'https://cdn.jsdelivr.net/npm/@joeattardi/emoji-butt
     return;
   }
 
-  const { data: { session }, error } = await window.supabaseClient.auth.getSession();
+  const { data: { session: sessionData }, error } = await window.supabaseClient.auth.getSession();
+  session = sessionData;
 
   if (error) {
     console.error('Error getting session:', error);
@@ -29,7 +33,6 @@ import { EmojiButton } from 'https://cdn.jsdelivr.net/npm/@joeattardi/emoji-butt
   // If we have a session, set the current user and initialize the chat
   console.log('Session found for user:', session.user.email);
   // Simple way to get a username from an email
-  CURRENT_USERNAME = session.user.email.split('@')[0];
 
   // Now initialize the rest of the script
   initializeApp();
@@ -62,7 +65,7 @@ function initializeApp() {
     const cancelEditBtn = document.getElementById('cancelEditBtn');
     const emojiSuggestionsEl = document.getElementById('emojiSuggestions'); // div in HTML
 
-    if (currentUsernameEl) currentUsernameEl.textContent = CURRENT_USERNAME;
+    if (currentUsernameEl) currentUsernameEl.textContent = session.user.email;
 
     // edit state
     let editingMessage = null;
@@ -211,7 +214,7 @@ function initializeApp() {
     const welcome = messagesEl.querySelector('.welcome-message');
     if (welcome) welcome.remove();
 
-    const isMe = msg.user_name === CURRENT_USERNAME;
+    const isMe = msg.user_name === session.user.email;
 
     const row = document.createElement('div');
     row.className = 'message-row ' + (isMe ? 'me' : 'other');
@@ -325,7 +328,7 @@ function initializeApp() {
         if (!typingIndicator) return;
 
         // only show if someone else is typing
-        if (username && username !== CURRENT_USERNAME && isTyping) {
+        if (username && username !== session.user.email && isTyping) {
             const span = typingIndicator.querySelector('span');
             if (span) span.textContent = `${username} is typing`;
             typingIndicator.style.display = 'inline-flex';
@@ -485,7 +488,7 @@ function initializeApp() {
 
         const payload = {
         room_name: ROOM_NAME,
-        user_name: CURRENT_USERNAME,
+        user_name: session.user.email,
         content: processedText || '',
         type: imageUrl ? 'image' : 'text',
         url: imageUrl || null,
@@ -639,7 +642,7 @@ function initializeApp() {
         type: 'broadcast',
         event: TYPING_EVENT,
         payload: {
-            username: CURRENT_USERNAME,
+            username: session.user.email,
             isTyping: true,
         },
         });
@@ -652,7 +655,7 @@ function initializeApp() {
             type: 'broadcast',
             event: TYPING_EVENT,
             payload: {
-            username: CURRENT_USERNAME,
+            username: session.user.email,
             isTyping: false,
             },
         });
