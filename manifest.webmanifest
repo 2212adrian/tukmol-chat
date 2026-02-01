@@ -1,0 +1,20 @@
+{
+  "name": "Tropang Tukmol Chat",
+  "short_name": "Tukmol Chat",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#050509",
+  "theme_color": "#ffb453",
+  "icons": [
+    {
+      "src": "/Logo-192.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/Logo-512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

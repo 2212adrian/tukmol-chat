@@ -1,0 +1,18 @@
+{
+  "name": "tropang-tukmol-chat",
+  "version": "1.0.0",
+  "description": "Tropang Tukmol realtime chat PWA (Supabase + vanilla JS).",
+  "private": true,
+  "scripts": {
+    "dev": "serve . -p 4173",
+    "format": "prettier \"**/*.{js,css,html,json}\" --write",
+    "lint:format": "prettier \"**/*.{js,css,html,json}\" --check"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "serve": "^14.2.1"
+  },
+  "dependencies": {
+    "sweetalert2": "^11.26.17"
+  }
+}

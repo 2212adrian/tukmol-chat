@@ -2,113 +2,131 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Tropang Tukmol</title>
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icon-192x192.png" />
 
-    <!-- Animate.css -->
+    <title>Tropang Tukmol</title>
+
+    <!-- Styles -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"
     />
-    <!-- Toastify CSS -->
     <link
       rel="stylesheet"
-      type="text/css"
       href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
     />
-    <!-- Fonts -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap"
       rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&amp;display=swap"
     />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
     />
-
-    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    <script type="module" src="script.js"></script>
   </head>
+
+  <style></style>
+
   <body>
-    <!-- Main Container -->
     <div class="app-layout" id="appLayout">
-      <!-- SIDEBAR (Hidden behind Chat on Mobile Load) -->
+      <!-- ================= SIDEBAR ================= -->
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
           <div class="user-welcome">
-            <small>Welcome back,</small>
-            <h3 id="sidebarUsername">User</h3>
+            <div id="sidebarUserAvatar" class="sidebar-user-avatar"></div>
+            <div class="sidebar-user-text">
+              <small>Welcome back,</small>
+              <h3 id="sidebarUsername">User</h3>
+            </div>
           </div>
-          <button id="logoutBtn" class="icon-btn-ghost" title="Logout">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
+
+          <!-- Sidebar burger (inside sidebar) -->
+          <button
+            class="sidebar-burger"
+            id="sidebarBurger"
+            title="Toggle sidebar"
+          >
+            ☰
           </button>
         </div>
 
-        <!-- Story/Contact Row -->
-        <div class="stories-container">
-          <div class="story-item">
-            <div class="story-ring add">+</div>
-            <span>Add</span>
-          </div>
-          <div class="story-item">
-            <img src="https://i.pravatar.cc/150?img=32" alt="User" />
-            <span>Jane</span>
-          </div>
-          <div class="story-item">
-            <img src="https://i.pravatar.cc/150?img=12" alt="User" />
-            <span>Mark</span>
-          </div>
-        </div>
+        <div class="stories-container" id="onlineUsersContainer"></div>
 
-        <!-- Channel List -->
         <div class="channel-list">
           <div class="list-label">Channels</div>
 
-          <div class="channel-item active" onclick="openChatMobile('General')">
+          <div
+            class="channel-item active"
+            data-room-name="general-1"
+            data-room-display="General 1"
+          >
             <div class="avatar-box purple">#</div>
             <div class="channel-info">
-              <h4>General</h4>
-              <p>Tropang Tukmol Main</p>
+              <h4>General 1</h4>
+              <p>Main room</p>
             </div>
             <span class="time">Now</span>
           </div>
 
-          <div class="channel-item" onclick="openChatMobile('Memes')">
+          <div
+            class="channel-item"
+            data-room-name="general-2"
+            data-room-display="General 2"
+          >
             <div class="avatar-box pink">#</div>
             <div class="channel-info">
-              <h4>Memes</h4>
-              <p>Send funny stuff...</p>
+              <h4>General 2</h4>
+              <p>Secondary room</p>
             </div>
             <span class="time">2m</span>
           </div>
+
+          <div
+            class="channel-item"
+            data-room-name="general-3"
+            data-room-display="General 3"
+          >
+            <div class="avatar-box teal">#</div>
+            <div class="channel-info">
+              <h4>General 3</h4>
+              <p>Late night chat</p>
+            </div>
+            <span class="time">5m</span>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <button id="installPwaBtn" class="sidebar-pill install-btn">
+            <span>Download app</span>
+          </button>
+          <button id="settingsBtn" class="sidebar-pill settings-btn">
+            <i class="fa-solid fa-gear"></i><span>Settings</span>
+          </button>
+          <button id="logoutBtn" class="sidebar-pill logout-btn">
+            <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
+          </button>
         </div>
       </aside>
 
-      <!-- CHAT AREA (Visible on Mobile Load) -->
+      <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+      <!-- ================= CHAT AREA ================= -->
       <main class="chat-area" id="chatArea">
-        <!-- Chat Header -->
+        <!-- Header -->
         <header class="chat-header">
           <div class="header-left">
-            <!-- Back Button: Hides Chat to reveal Sidebar -->
-            <button
-              class="back-btn-mobile"
-              id="mobileBackBtn"
-              onclick="revealSidebar()"
-            >
-              <!-- Hamburger / Menu Icon or Back Arrow -->
+            <button class="back-btn-mobile" id="mobileBackBtn">
               <svg
                 width="24"
                 height="24"
@@ -124,48 +142,76 @@
               </svg>
             </button>
 
-            <div class="header-avatar">
-              <img
-                src="https://ui-avatars.com/api/?name=General&background=6B4C9A&color=fff"
-                alt="G"
-              />
-            </div>
+            <!-- Topbar burger (separate id) -->
+            <button
+              class="sidebar-burger"
+              id="headerBurger"
+              title="Open sidebar"
+            >
+              ☰
+            </button>
+
+            <div id="headerUserAvatar" class="header-avatar"></div>
+
             <div class="header-info">
               <h2 id="roomNameHeader">General</h2>
               <div class="status"><span class="dot"></span> Online</div>
             </div>
           </div>
+
           <div class="header-right">
-            <button class="icon-btn-ghost" style="color: #555">⋮</button>
+            <button class="icon-btn-ghost"></button>
+            <button id="refreshChatBtn" title="Refresh chat">⟳</button>
             <button id="themeToggle">🌙</button>
           </div>
         </header>
 
-        <!-- Messages List -->
-        <div id="messages" class="messages-container">
-          <!-- Messages injected by JS -->
+        <!-- Messages -->
+        <div
+          id="typingIndicator"
+          class="typing-indicator"
+          style="display: none"
+        ></div>
+        <div
+          id="messages"
+          class="messages-container"
+          data-bubble-style="solid"
+          data-chat-texture=""
+        ></div>
+
+        <!-- Typing -->
+        <div id="typingIndicator" class="typing-indicator">
+          <span class="typing-indicator-label">Someone is typing</span>
+          <span class="typing-indicator-dots">
+            <span class="typing-indicator-dot"></span>
+            <span class="typing-indicator-dot"></span>
+            <span class="typing-indicator-dot"></span>
+          </span>
         </div>
 
-        <!-- Typing Indicator -->
-        <div class="typing-indicator-box" id="typingIndicator">
-          <span>Someone is typing</span>
-          <div class="dots"><span></span><span></span><span></span></div>
-        </div>
-
-        <!-- Input Area -->
+        <!-- Input -->
         <div id="newMessagesBtn" class="new-messages-btn">↓ New Messages</div>
+
         <div class="input-section">
+          <div class="drag-overlay" id="dragOverlay">
+            <div class="drag-overlay-inner">
+              <div class="drag-icon">⬆️</div>
+              <div class="drag-text-main">
+                Drop your image into the chat box
+              </div>
+              <div class="drag-text-sub">You can add up to 4 images</div>
+            </div>
+          </div>
+
           <div class="input-wrapper">
             <label for="imageInput" class="attach-btn">+</label>
             <input type="file" id="imageInput" accept="image/*" hidden />
 
             <div class="text-field-container">
-              <div id="inputLabel" class="edit-badge" style="display: none">
-                Editing
-              </div>
+              <div id="inputLabel" class="edit-badge" hidden>Editing</div>
               <input
-                type="text"
                 id="messageInput"
+                type="text"
                 placeholder="Message..."
                 autocomplete="off"
               />
@@ -181,38 +227,80 @@
               >
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
               </svg>
+              <span id="sendIcon"></span>
             </button>
-            <button
-              id="cancelEditBtn"
-              class="cancel-edit-btn"
-              style="display: none"
-            >
-              ✕
-            </button>
+
+            <button id="cancelEditBtn" class="cancel-edit-btn" hidden>✕</button>
           </div>
+
           <div class="file-preview" id="filePreview"></div>
           <div id="emojiSuggestions" class="emoji-suggestions"></div>
         </div>
       </main>
     </div>
 
+    <div id="imageViewerContainer"></div>
+    <div id="logoutOverlay" class="logout-overlay">
+      <div class="logout-modal">
+        <div class="logout-icon">⚠</div>
+        <h3>Sign out of Tropang Tukmol?</h3>
+        <p>You will leave this session. Your chats stay safe.</p>
+        <div class="logout-actions">
+          <button
+            type="button"
+            id="logoutCancelBtn"
+            class="logout-btn logout-btn--ghost"
+          >
+            Stay
+          </button>
+          <button
+            type="button"
+            id="logoutConfirmBtn"
+            class="logout-btn logout-btn--primary"
+          >
+            Leave
+          </button>
+        </div>
+        <div class="logout-progress">
+          <div class="logout-progress-bar"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://unpkg.com/emoji-js@3.8.0/lib/emoji.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="settings.js"></script>
 
     <script src="supabase-init.js"></script>
     <script src="emojis.js"></script>
     <script type="module" src="script.js"></script>
 
-    <!-- Mobile Navigation Logic -->
     <script>
-      // Function to slide Chat IN (Covering sidebar)
+      const appLayout = document.getElementById('appLayout');
+      const sidebarBurger = document.getElementById('sidebarBurger');
+      const headerBurger = document.getElementById('headerBurger');
+      const mobileBackBtn = document.getElementById('mobileBackBtn');
+
+      // Sidebar burger (in sidebar) → go to chat
+      sidebarBurger?.addEventListener('click', () => {
+        appLayout.classList.add('chat-active');
+      });
+
+      // Topbar burger (in chat header) → show sidebar
+      headerBurger?.addEventListener('click', () => {
+        appLayout.classList.remove('chat-active');
+      });
+
+      // Back arrow → show sidebar
+      mobileBackBtn?.addEventListener('click', () => {
+        appLayout.classList.remove('chat-active');
+      });
+
       function openChatMobile(name) {
         if (window.innerWidth <= 768) {
-          document
-            .getElementById('appLayout')
-            .classList.add('mobile-chat-active');
+          appLayout.classList.add('chat-active');
           if (name) {
             document.getElementById('roomNameHeader').textContent =
               name.replace('#', '');
@@ -220,21 +308,10 @@
         }
       }
 
-      // Function to slide Chat OUT (Revealing sidebar)
-      function revealSidebar() {
-        document
-          .getElementById('appLayout')
-          .classList.remove('mobile-chat-active');
-      }
-
-      // AUTO-RUN ON LOAD
       document.addEventListener('DOMContentLoaded', () => {
-        // If we are on mobile, automatically open the chat view
-        if (window.innerWidth <= 768) {
-          // We add the class immediately so the Sidebar is hidden by default
-          openChatMobile('General');
-        }
+        if (window.innerWidth <= 768) openChatMobile('General');
       });
     </script>
+    <link rel="stylesheet" href="style.css" />
   </body>
 </html>

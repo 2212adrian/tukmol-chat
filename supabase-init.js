@@ -2,8 +2,9 @@
 
 const SUPABASE_URL = 'https://ehupnvkselcupxqyofzy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_cNXTZmBrYiYvd8SOI2ZGkQ_sWHLy_uf';
+const AVATAR_BUCKET = 'profile-pictures';
+const PUBLIC_BASE = `${SUPABASE_URL}/storage/v1/object/public/${AVATAR_BUCKET}`;
 
-// IMPORTANT: use the global `supabase` from CDN, and store the client
 window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     storage: window.sessionStorage,
@@ -11,6 +12,9 @@ window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     persistSession: true,
     detectSessionInUrl: true,
   },
+  realtime: {
+    params: {
+      eventsPerSecond: 20,
+    },
+  },
 });
-
-console.log('Tropang Tukmol: Supabase client initialized.');
