@@ -2,6 +2,12 @@
 import { EmojiButton } from 'https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js';
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked@5.1.1/lib/marked.esm.js';
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((reg) => reg.unregister());
+  });
+}
+
 let emojiPicker = null;
 
 const supabaseClient = window.supabaseClient;
@@ -2903,14 +2909,6 @@ if (installBtn) {
       showToast('Install cancelled.', 'info');
     }
     deferredPrompt = null;
-  });
-}
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .catch((err) => alert('SW registration failed', err));
   });
 }
 
