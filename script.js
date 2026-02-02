@@ -2,6 +2,8 @@
 import { EmojiButton } from 'https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js';
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked@5.1.1/lib/marked.esm.js';
 
+let emojiPicker = null;
+
 const supabaseClient = window.supabaseClient;
 function debugToast(text) {
   Toastify({
@@ -339,7 +341,7 @@ function initializeApp() {
       payload: {
         username: CURRENT_USERNAME,
         isTyping,
-        room: ROOM_NAME, // Already added, good
+        room: ROOM_NAME,
       },
     });
 
@@ -354,17 +356,18 @@ function initializeApp() {
     const el = document.getElementById('typingIndicator');
     if (!el) return;
 
+    el.classList.remove('show', 'fade-out');
+
     if (currentTypers.size === 0) {
-      el.classList.remove('show');
+      el.classList.add('fade-out');
       return;
     }
 
-    const labelEl = el.querySelector('.typing-indicator-label');
-    if (currentTypers.size === 1) {
-      labelEl.textContent = `${Array.from(currentTypers)[0]} is typing…`;
-    } else {
-      labelEl.textContent = `${currentTypers.size} users typing…`;
-    }
+    const labelEl = el.querySelector('.typing-indicator-label') || el;
+    labelEl.textContent =
+      currentTypers.size === 1
+        ? `${Array.from(currentTypers)[0]} is typing…`
+        : `${currentTypers.size} users typing…`;
 
     el.classList.add('show');
   }
@@ -678,10 +681,6 @@ function initializeApp() {
   }
 
   if (textFieldContainer) textFieldContainer.classList.remove('chat-has-text');
-  let typingTimeout;
-  let typingTimeoutLocal = null;
-  let typingThrottle;
-
   function handleMessageInputChange() {
     updateSendButtonState();
 
@@ -720,12 +719,16 @@ function initializeApp() {
 
   // === CLEANED INPUT LISTENER (REPLACE THE ENTIRE OLD ONE) ===
   messageInput.addEventListener('input', () => {
-    // Typing: single call handles broadcast + timeout
+    // Auto-grow for multiline textarea
+    messageInput.style.height = 'auto';
+    messageInput.style.height = messageInput.scrollHeight + 'px';
+
+    // Typing indicator: broadcast + timeout
     sendTyping(true);
     if (typingTimeoutId) clearTimeout(typingTimeoutId);
     typingTimeoutId = setTimeout(() => sendTyping(false), 2000);
 
-    // Send button + input state (call handler once)
+    // Send button + input state
     handleMessageInputChange();
 
     // Emoji suggestions
@@ -744,6 +747,7 @@ function initializeApp() {
       hideEmojiSuggestions();
       return;
     }
+
     showEmojiSuggestions(afterColon, colonIndex);
   });
 
@@ -1246,11 +1250,14 @@ function initializeApp() {
     try {
       const { data, error } = await supabaseClient
         .from('message_reactions')
-        .select('message_id, user_name, emoji'); // 👈 no room_name
+        .select('message_id, user_name, emoji');
 
       if (error) throw error;
 
-      MESSAGE_REACTIONS = {};
+      // CLEAR object without reassigning
+      Object.keys(MESSAGE_REACTIONS).forEach(
+        (k) => delete MESSAGE_REACTIONS[k],
+      );
 
       (data || []).forEach((r) => {
         if (!MESSAGE_REACTIONS[r.message_id]) {
@@ -1824,9 +1831,31 @@ function initializeApp() {
 
   function renderMessage(msg, scroll = true, prepend = false) {
     const row = createMessageRow(msg);
-    row.classList.add('message-enter');
 
-    // remove class after animation so reflows stay cheap
+    // Do NOT override text for deleted messages
+    if (!msg.deleted_at) {
+      const textEl = row.querySelector('.message-text');
+      if (textEl && typeof msg.content === 'string') {
+        const safe = msg.content
+          .split('\n')
+          .map((line) =>
+            line.replace(/[&<>"']/g, (ch) => {
+              const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+              };
+              return map[ch];
+            }),
+          )
+          .join('<br>');
+        textEl.innerHTML = safe;
+      }
+    }
+
+    row.classList.add('message-enter');
     row.addEventListener(
       'animationend',
       () => {
@@ -2064,7 +2093,7 @@ function initializeApp() {
   function cancelEdit() {
     editingMessage = null;
     messageInput.value = '';
-
+    messageInput.style.height = 'auto';
     const inputSection = document.querySelector('.input-section');
     if (inputSection) inputSection.classList.remove('editing');
 
@@ -2080,13 +2109,18 @@ function initializeApp() {
     const row = messagesEl.querySelector(`[data-message-id="${msg.id}"]`);
     if (!row) return;
 
-    const content = row.querySelector('.message-text'); // adjust selector
+    const content = row.querySelector('.message-text');
     if (content) {
       const name = msg.deleted_by_name || msg.user_name || 'Someone';
       content.textContent = `${name} just deleted this message`;
     }
 
-    // Optional: visually dim the bubble instead of removing it
+    // REMOVE any images/GIFs visually
+    const grid = row.querySelector('.message-image-grid');
+    if (grid) {
+      grid.remove();
+    }
+
     row.classList.add('message-deleted');
 
     row.classList.add('message-leave');
@@ -2245,7 +2279,6 @@ function initializeApp() {
     const chatBgColor = myProfile?.chat_bg_color || '#2563eb';
     const chatTextColor = myProfile?.chat_text_color || null;
     const chatTexture = myProfile?.chat_texture || null;
-    console.log(chatTextColor);
 
     // EDIT MODE
     if (editingMessage) {
@@ -2261,7 +2294,7 @@ function initializeApp() {
           .from('messages')
           .update({
             content: processedText,
-            updated_at: new Date().toISOString(), // CRITICAL: Updates the timestamp
+            updated_at: new Date().toISOString(),
           })
           .eq('id', editingMessage.id)
           .select('*')
@@ -2269,10 +2302,8 @@ function initializeApp() {
 
         if (error) throw error;
 
-        // 1. Optimistic UI update for yourself (Calls updateExistingMessageContent)
         updateExistingMessageContent(data);
 
-        // 2. Broadcast for all other users to synchronize immediately
         await chatChannel.send({
           type: 'broadcast',
           event: 'message_edited',
@@ -2281,7 +2312,7 @@ function initializeApp() {
 
         showToast('Message edited.', 'success');
         cancelEdit();
-        return; // Exit after successful edit
+        return;
       } catch (err) {
         logError('Edit error', err);
         showToast(
@@ -2359,29 +2390,23 @@ function initializeApp() {
 
       if (error) throw error;
 
-      // 1. Render new message on local client
       const atBottom = isNearBottom();
       renderMessage(data, atBottom, false);
       if (!atBottom) newMsgBtn.style.display = 'block';
 
-      // 2. Broadcast for all other users (using original 'message' event)
-      // NOTE: The `postgres_changes` listener would also pick this up, but
-      // broadcasting ensures lowest latency for the user who sent it.
       await chatChannel.send({
         type: 'broadcast',
-        event: 'message', // <-- Correct event for NEW messages
+        event: 'message',
         payload: data,
       });
-
-      // REMOVED REDUNDANT LISTENER:
-      // chatChannel.on('broadcast', { event: REACTION_EVENT }, ({ payload }) => {
-      //   applyReactionToCacheAndUI(payload);
-      // });
     } catch (err) {
       logError('Send error (full object)', err);
       showToast('Failed to send: ' + (err.message || 'Unknown error'), 'error');
     } finally {
+      // clear and RESET textarea height
       messageInput.value = '';
+      messageInput.style.height = 'auto';
+
       imageInput.value = '';
 
       attachedImages.forEach((i) => URL.revokeObjectURL(i.url));
@@ -2391,6 +2416,7 @@ function initializeApp() {
       sendBtn.disabled = false;
     }
   }
+
   // === EMOJI SUGGESTION DROPDOWN ===
   function hideEmojiSuggestions() {
     if (!emojiSuggestionsEl) return;
@@ -2729,7 +2755,16 @@ function initializeApp() {
     }
 
     const mode = data?.theme_mode === 'dark' ? 'dark' : 'light';
+
+    // apply to body / app
     applyThemeMode(mode);
+
+    // also apply to emoji picker container
+    const picker = document.querySelector('.emoji-picker');
+    if (picker) {
+      picker.classList.remove('light', 'dark');
+      picker.classList.add(mode); // 'dark' or 'light'
+    }
   }
 
   function applyThemeMode(mode) {
@@ -2741,6 +2776,8 @@ function initializeApp() {
       body.classList.add('light-mode');
       body.classList.remove('dark-mode');
     }
+
+    applyEmojiPickerTheme();
   }
 
   async function saveThemePreference(mode) {
@@ -2762,31 +2799,37 @@ function initializeApp() {
       const isDark = document.body.classList.contains('dark-mode');
       const newMode = isDark ? 'light' : 'dark';
 
+      // keep your existing body theming
       applyThemeMode(newMode);
       await saveThemePreference(newMode);
+
+      // simple: swap emoji-picker light/dark class
+      const picker = document.querySelector('.emoji-picker');
+      if (picker) {
+        picker.classList.remove('light', 'dark');
+        picker.classList.add(newMode); // 'light' or 'dark'
+      }
     });
+  }
+
+  // Helper: sync emoji picker theme
+  function applyEmojiPickerTheme() {
+    if (!emojiPicker) return;
+    const isDark = document.body.classList.contains('dark-mode');
+    emojiPicker.setTheme(isDark ? 'dark' : 'light');
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
     inputLabelEl = document.getElementById('inputLabel');
     sendIconEl = document.getElementById('sendIcon');
     cancelEditBtn = document.getElementById('cancelEditBtn');
-    await bootstrapSession(); // sets window.session and supabaseClient
+
+    await bootstrapSession();
     await fetchMyProfileIfMissing();
-    await initializeApp(); // your existing startup, including loadMessages()
-
-    // after initializeApp, profilesByUserId should be populated
+    await initializeApp();
     applyThemeFromProfile();
-
-    const themeToggle = document.getElementById('themeToggle');
-    if (!themeToggle) return;
-
-    themeToggle.addEventListener('click', async () => {
-      const isDark = document.body.classList.toggle('dark-mode');
-      const mode = isDark ? 'dark' : 'light';
-      await saveThemePreference(mode);
-    });
   });
+
   async function initChat() {
     if (!supabaseClient) return;
     await loadMessages();

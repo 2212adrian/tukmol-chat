@@ -6,10 +6,8 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icon-192x192.png" />
-
     <title>Tropang Tukmol</title>
 
     <!-- Styles -->
@@ -23,7 +21,7 @@
     />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&amp;display=swap"
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap"
     />
     <link
       rel="stylesheet"
@@ -33,15 +31,17 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css"
     />
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
-    <script type="module" src="script.js"></script>
-  </head>
 
-  <style></style>
+    <!-- CORRECT SCRIPT ORDER - Supabase FIRST -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-init.js"></script>
+    <script src="emojis.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+  </head>
 
   <body>
     <div class="app-layout" id="appLayout">
-      <!-- ================= SIDEBAR ================= -->
+      <!-- SIDEBAR -->
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
           <div class="user-welcome">
@@ -51,8 +51,6 @@
               <h3 id="sidebarUsername">User</h3>
             </div>
           </div>
-
-          <!-- Sidebar burger (inside sidebar) -->
           <button
             class="sidebar-burger"
             id="sidebarBurger"
@@ -122,7 +120,7 @@
 
       <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-      <!-- ================= CHAT AREA ================= -->
+      <!-- CHAT AREA -->
       <main class="chat-area" id="chatArea">
         <!-- Header -->
         <header class="chat-header">
@@ -142,8 +140,6 @@
                 <polyline points="12 19 5 12 12 5"></polyline>
               </svg>
             </button>
-
-            <!-- Topbar burger (separate id) -->
             <button
               class="sidebar-burger"
               id="headerBurger"
@@ -151,15 +147,12 @@
             >
               ☰
             </button>
-
             <div id="headerUserAvatar" class="header-avatar"></div>
-
             <div class="header-info">
               <h2 id="roomNameHeader">General</h2>
               <div class="status"><span class="dot"></span> Online</div>
             </div>
           </div>
-
           <div class="header-right">
             <button class="icon-btn-ghost"></button>
             <button id="refreshChatBtn" title="Refresh chat">⟳</button>
@@ -167,12 +160,7 @@
           </div>
         </header>
 
-        <!-- Messages -->
-        <div
-          id="typingIndicator"
-          class="typing-indicator"
-          style="display: none"
-        ></div>
+        <!-- Messages Container -->
         <div
           id="messages"
           class="messages-container"
@@ -180,7 +168,9 @@
           data-chat-texture=""
         ></div>
 
-        <!-- Typing -->
+        <!-- New Messages Button -->
+        <div id="newMessagesBtn" class="new-messages-btn">↓ New Messages</div>
+        <!-- SINGLE Typing Indicator (REMOVED DUPLICATE!) -->
         <div id="typingIndicator" class="typing-indicator">
           <span class="typing-indicator-label">Someone is typing</span>
           <span class="typing-indicator-dots">
@@ -189,10 +179,7 @@
             <span class="typing-indicator-dot"></span>
           </span>
         </div>
-
-        <!-- Input -->
-        <div id="newMessagesBtn" class="new-messages-btn">↓ New Messages</div>
-
+        <!-- Input Section -->
         <div class="input-section">
           <div class="drag-overlay" id="dragOverlay">
             <div class="drag-overlay-inner">
@@ -210,12 +197,12 @@
 
             <div class="text-field-container">
               <div id="inputLabel" class="edit-badge" hidden>Editing</div>
-              <input
+              <textarea
                 id="messageInput"
-                type="text"
                 placeholder="Message..."
                 autocomplete="off"
-              />
+                rows="1"
+              ></textarea>
               <button id="emojiBtn" class="emoji-btn">😊</button>
             </div>
 
@@ -230,7 +217,6 @@
               </svg>
               <span id="sendIcon"></span>
             </button>
-
             <button id="cancelEditBtn" class="cancel-edit-btn" hidden>✕</button>
           </div>
 
@@ -240,6 +226,7 @@
       </main>
     </div>
 
+    <!-- Modals -->
     <div id="imageViewerContainer"></div>
     <div id="logoutOverlay" class="logout-overlay">
       <div class="logout-modal">
@@ -268,51 +255,35 @@
       </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts - CORRECT FINAL ORDER -->
     <script src="https://unpkg.com/emoji-js@3.8.0/lib/emoji.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="settings.js"></script>
-
-    <script src="supabase-init.js"></script>
-    <script src="emojis.js"></script>
+    <!-- SINGLE script.js AT END -->
     <script type="module" src="script.js"></script>
 
+    <!-- Inline mobile handlers -->
     <script>
-      const appLayout = document.getElementById('appLayout');
-      const sidebarBurger = document.getElementById('sidebarBurger');
-      const headerBurger = document.getElementById('headerBurger');
-      const mobileBackBtn = document.getElementById('mobileBackBtn');
-
-      // Sidebar burger (in sidebar) → go to chat
-      sidebarBurger?.addEventListener('click', () => {
-        appLayout.classList.add('chat-active');
-      });
-
-      // Topbar burger (in chat header) → show sidebar
-      headerBurger?.addEventListener('click', () => {
-        appLayout.classList.remove('chat-active');
-      });
-
-      // Back arrow → show sidebar
-      mobileBackBtn?.addEventListener('click', () => {
-        appLayout.classList.remove('chat-active');
-      });
-
-      function openChatMobile(name) {
-        if (window.innerWidth <= 768) {
-          appLayout.classList.add('chat-active');
-          if (name) {
-            document.getElementById('roomNameHeader').textContent =
-              name.replace('#', '');
-          }
-        }
-      }
-
       document.addEventListener('DOMContentLoaded', () => {
-        if (window.innerWidth <= 768) openChatMobile('General');
+        const appLayout = document.getElementById('appLayout');
+        const sidebarBurger = document.getElementById('sidebarBurger');
+        const headerBurger = document.getElementById('headerBurger');
+        const mobileBackBtn = document.getElementById('mobileBackBtn');
+
+        sidebarBurger?.addEventListener('click', () =>
+          appLayout.classList.add('chat-active'),
+        );
+        headerBurger?.addEventListener('click', () =>
+          appLayout.classList.remove('chat-active'),
+        );
+        mobileBackBtn?.addEventListener('click', () =>
+          appLayout.classList.remove('chat-active'),
+        );
+
+        if (window.innerWidth <= 768) appLayout.classList.add('chat-active');
       });
     </script>
+
     <link rel="stylesheet" href="style.css" />
   </body>
 </html>

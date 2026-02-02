@@ -82,6 +82,7 @@
 
       /* Card shell */
       .settings-card {
+        overflow: hidden;
         position: relative;
         background: rgba(15, 23, 42, 0.85);
         border-radius: clamp(0.8rem, 2vw, 1.25rem);
@@ -89,7 +90,14 @@
         box-shadow: 0 18px 45px rgba(15, 23, 42, 0.85);
         backdrop-filter: blur(26px);
         -webkit-backdrop-filter: blur(26px);
-        overflow: hidden;
+      }
+
+      /* Desktop size: Constrain card height and configure internal scrolling */
+      @media (min-width: 769px) {
+        .settings-card {
+          /* Max height to enforce internal scrolling within the card */
+          max-height: calc(100vh - 5rem);
+        }
       }
 
       .settings-card::before {
@@ -128,15 +136,77 @@
       .settings-side {
         position: relative;
         z-index: 1;
-        padding: clamp(1rem, 3vw, 2rem);
       }
 
       .settings-main {
+        padding: clamp(1rem, 3vw, 2rem);
         border-right: 1px solid rgba(31, 41, 55, 0.95);
       }
 
       .settings-side {
         background: radial-gradient(circle at top, #020617, #020617 40%, #000);
+        padding: 0; /* Removing default padding here on all screen sizes */
+        height: 1100px !important;
+      }
+
+      /* Desktop Layout for Sticky Footer/Preview on Right Column */
+      @media (min-width: 769px) {
+        .settings-side {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          height: 1100px !important;
+          /* The whole side column is a flex container for the scrollable content and sticky bottom elements */
+        }
+
+        .settings-side-scroll-content {
+          flex-grow: 1;
+          overflow-y: auto; /* The scrollable content area */
+          /* Apply padding to the content that scrolls */
+          padding: clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem) 0; /* Top, Left/Right, 0 Bottom */
+        }
+
+        /* Elements that should stick to the bottom/end of the side container */
+        .settings-side-bottom-sticky {
+          /* This div contains both the preview and the save button for sticking */
+          flex-shrink: 0; /* Prevent from shrinking */
+          position: sticky;
+          bottom: 0;
+          z-index: 10;
+          /* Match .settings-side background and apply padding/shadow to obscure content scrolling underneath */
+          background: radial-gradient(
+            circle at top,
+            #020617,
+            #020617 40%,
+            #000
+          );
+          box-shadow: 0 -10px 20px rgba(2, 6, 23, 0.9);
+          padding: 0 clamp(1rem, 3vw, 2rem) clamp(1rem, 3vw, 2rem); /* 0 Top, Left/Right, Bottom */
+        }
+
+        .settings-footer {
+          /* Already inside .settings-side-bottom-sticky, reset default margins */
+          margin-top: 1rem; /* Keep this if you want space between preview and button, or set to 0 */
+          padding-bottom: 0;
+          position: static; /* Should not be sticky itself, parent handles stickiness */
+          box-shadow: none; /* Remove any sticky box-shadow */
+        }
+
+        /* The preview field needs padding at the top of the sticky area */
+        .settings-field.preview-field-sticky {
+          padding-top: 1rem;
+          margin-bottom: 0;
+          position: fixed;
+          bottom: 60px;
+          margin-left: auto;
+          align-items: center;
+          /* align-self: center; */
+          margin-left: 40%;
+        }
+
+        .texture-grid {
+          max-height: 480px; /* Keep max-height for texture grid if possible, or remove if causing issues */
+        }
       }
 
       .settings-section {
@@ -548,6 +618,7 @@
         grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
         gap: 0.5rem;
         max-height: 480px;
+        /* The container itself scrolls when it's too big */
         overflow-y: auto;
         padding: 0.5rem;
       }
@@ -667,6 +738,10 @@
         box-shadow:
           0 8px 16px rgba(15, 23, 42, 1),
           0 0 0 1px rgba(148, 163, 184, 1);
+      }
+
+      #message-bubble {
+        margin: 20px;
       }
 
       /* Preview bubble */
@@ -907,15 +982,55 @@
           max-width: 100%;
         }
 
-        .settings-footer {
-          justify-content: stretch;
-          margin-top: 0.6rem;
+        #settingsSaveBtn {
+          position: fixed;
+          left: 50%;
+          bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+          transform: translateX(-50%);
+          width: auto; /* or 90% if you want almost full width */
+          min-width: 60%;
+          z-index: 999;
         }
 
-        .settings-save-btn {
-          width: 100%;
+        /* Make footer not interfere with layout */
+        .settings-footer {
+          margin-top: 3.5rem; /* space so content doesn’t hide behind button */
+          justify-content: center;
+        }
+
+        .settings-side {
+          display: block; /* Reset flex on mobile */
+          padding: clamp(
+            1rem,
+            3vw,
+            2rem
+          ); /* Restore default padding on mobile */
+        }
+
+        .settings-side-scroll-content {
+          overflow-y: visible; /* Prevent unwanted inner scroll on mobile */
+          padding: 0;
+        }
+
+        .settings-side-bottom-sticky {
+          position: static;
+          background: none;
+          box-shadow: none;
+          padding: 0;
+        }
+
+        .settings-field.preview-field-sticky {
+          margin-left: 25%;
+          margin-right: 20%;
+          padding-top: 0;
+          margin-bottom: 1.1rem;
+          position: fixed;
+          bottom: 50px;
+          align-items: center;
         }
       }
+
+      /* Base Footer Styles (only applies where not overridden by media query) */
       .settings-footer {
         display: flex;
         justify-content: flex-end;
@@ -939,6 +1054,9 @@
           box-shadow 0.18s ease,
           filter 0.18s ease,
           letter-spacing 0.16s ease;
+        position: fixed;
+        bottom: 50px;
+        right: 50px;
       }
     </style>
   </head>
@@ -1044,95 +1162,6 @@
                 </div>
               </div>
             </section>
-
-            <!-- Bubble style + background -->
-            <section
-              class="settings-section"
-              aria-labelledby="bubbleSectionTitle"
-            >
-              <div class="settings-section-title" id="bubbleSectionTitle">
-                <i class="fa-solid fa-comment-dots"></i>
-                <span>Message bubble</span>
-              </div>
-
-              <div class="settings-field">
-                <label class="settings-label">
-                  <span>Style</span>
-                  <span class="sub">Customize how your messages look</span>
-                </label>
-
-                <div class="bubble-toggle-group" id="bubbleStyleGroup">
-                  <button
-                    type="button"
-                    class="bubble-toggle-option active"
-                    data-style="solid"
-                  >
-                    <i class="fa-solid fa-square-full"></i>
-                    <span>Solid</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="bubble-toggle-option"
-                    data-style="glass"
-                  >
-                    <i class="fa-regular fa-gem"></i>
-                    <span>Glass</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="bubble-toggle-option"
-                    data-style="outline"
-                  >
-                    <i class="fa-regular fa-square"></i>
-                    <span>Outline</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="bubble-toggle-option"
-                    data-style="texture"
-                  >
-                    <i class="fa-solid fa-layer-group"></i>
-                    <span>Texture</span>
-                  </button>
-                </div>
-              </div>
-
-              <div class="settings-field">
-                <label class="settings-label" for="chatTextColor">
-                  <span>Text color</span>
-                  <span class="sub">Color of text inside your bubbles</span>
-                </label>
-                <div class="color-row">
-                  <div class="color-swatch">
-                    <input id="chatTextColor" type="color" />
-                  </div>
-                  <input
-                    id="chatTextColorHex"
-                    type="text"
-                    class="settings-input"
-                    placeholder="#f9fafb"
-                  />
-                </div>
-              </div>
-
-              <div class="settings-field">
-                <label class="settings-label" for="chatBgColor">
-                  <span>Chat background</span>
-                  <span class="sub">Base color behind your bubbles</span>
-                </label>
-                <div class="color-row">
-                  <div class="color-swatch">
-                    <input id="chatBgColor" type="color" />
-                  </div>
-                  <input
-                    id="chatBgColorHex"
-                    type="text"
-                    class="settings-input"
-                    placeholder="#020617"
-                  />
-                </div>
-              </div>
-            </section>
           </section>
 
           <!-- RIGHT -->
@@ -1141,114 +1170,204 @@
             id="texturePreviewContainer"
             aria-labelledby="texturesSectionTitle"
           >
-            <!-- Textures -->
-            <section class="settings-section">
-              <div class="settings-section-title" id="texturesSectionTitle">
-                <i class="fa-solid fa-layer-group"></i>
-                <span>Textures</span>
-              </div>
+            <!-- START: Wrapper for scrollable content (Textures only) -->
+            <div class="settings-side-scroll-content">
+              <!-- Bubble style + background -->
+              <section
+                class="settings-section"
+                id="message-bubble"
+                aria-labelledby="bubbleSectionTitle"
+              >
+                <div class="settings-section-title" id="bubbleSectionTitle">
+                  <i class="fa-solid fa-comment-dots"></i>
+                  <span>Message bubble</span>
+                </div>
 
-              <div class="settings-field">
-                <label class="settings-label" for="textureSearch">
-                  <span>Overlay texture</span>
-                  <span class="sub">From /textures folder</span>
-                </label>
+                <div class="settings-field">
+                  <label class="settings-label">
+                    <span>Style</span>
+                    <span class="sub">Customize how your messages look</span>
+                  </label>
 
-                <!-- search bar -->
-                <div class="texture-search-row">
-                  <div class="texture-search-input-wrap">
-                    <i class="fa-solid fa-magnifying-glass"></i>
+                  <div class="bubble-toggle-group" id="bubbleStyleGroup">
+                    <button
+                      type="button"
+                      class="bubble-toggle-option active"
+                      data-style="solid"
+                    >
+                      <i class="fa-solid fa-square-full"></i>
+                      <span>Solid</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="bubble-toggle-option"
+                      data-style="glass"
+                    >
+                      <i class="fa-regular fa-gem"></i>
+                      <span>Glass</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="bubble-toggle-option"
+                      data-style="outline"
+                    >
+                      <i class="fa-regular fa-square"></i>
+                      <span>Outline</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="bubble-toggle-option"
+                      data-style="texture"
+                    >
+                      <i class="fa-solid fa-layer-group"></i>
+                      <span>Texture</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="settings-field">
+                  <label class="settings-label" for="chatTextColor">
+                    <span>Text color</span>
+                    <span class="sub">Color of text inside your bubbles</span>
+                  </label>
+                  <div class="color-row">
+                    <div class="color-swatch">
+                      <input id="chatTextColor" type="color" />
+                    </div>
                     <input
-                      id="textureSearch"
+                      id="chatTextColorHex"
                       type="text"
-                      class="settings-input texture-search-input"
-                      placeholder="Search textures (e.g. paper, noise, grid)..."
+                      class="settings-input"
+                      placeholder="#f9fafb"
                     />
                   </div>
                 </div>
 
-                <!-- suggested tags -->
-                <div class="texture-suggestions" id="textureSuggestions">
-                  <button type="button" class="texture-tag" data-query="brick">
-                    Brick / Wall
-                  </button>
-                  <button
-                    type="button"
-                    class="texture-tag"
-                    data-query="shattered"
-                  >
-                    Shattered / Glass
-                  </button>
-                  <button type="button" class="texture-tag" data-query="cube">
-                    Cubes / 3D
-                  </button>
-                  <button type="button" class="texture-tag" data-query="food">
-                    Food
-                  </button>
-                </div>
-
-                <!-- texture grid -->
-                <div class="texture-grid" id="textureGrid">
-                  <!-- JS will populate from /textures -->
-                </div>
-
-                <!-- pagination -->
-                <div class="texture-pagination" id="texturePagination">
-                  <button
-                    type="button"
-                    class="page-btn"
-                    data-dir="prev"
-                    aria-label="Previous textures page"
-                  >
-                    &laquo;
-                  </button>
-                  <div class="page-dots" id="texturePageDots"></div>
-                  <button
-                    type="button"
-                    class="page-btn"
-                    data-dir="next"
-                    aria-label="Next textures page"
-                  >
-                    &raquo;
-                  </button>
-                </div>
-              </div>
-
-              <!-- preview bubble -->
-              <div class="settings-field">
-                <label class="settings-label">
-                  <span>Preview</span>
-                  <span class="sub">
-                    Example chat bubble with selected texture
-                  </span>
-                </label>
-                <div class="bubble-preview-wrap">
-                  <div
-                    class="bubble-preview bubble-preview-me"
-                    id="bubblePreview"
-                  >
-                    <span class="bubble-preview-text">
-                      Bakal ako at Malaki ang Yabag ko
-                    </span>
+                <div class="settings-field">
+                  <label class="settings-label" for="chatBgColor">
+                    <span>Chat background</span>
+                    <span class="sub">Base color behind your bubbles</span>
+                  </label>
+                  <div class="color-row">
+                    <div class="color-swatch">
+                      <input id="chatBgColor" type="color" />
+                    </div>
+                    <input
+                      id="chatBgColorHex"
+                      type="text"
+                      class="settings-input"
+                      placeholder="#020617"
+                    />
                   </div>
                 </div>
-              </div>
-            </section>
+              </section>
+              <!-- Textures Section -->
+              <section class="settings-section">
+                <div class="settings-section-title" id="texturesSectionTitle">
+                  <i class="fa-solid fa-layer-group"></i>
+                  <span>Textures</span>
+                </div>
 
-            <!-- Save -->
-            <footer class="settings-footer">
-              <button
-                type="button"
-                id="settingsSaveBtn"
-                class="settings-save-btn"
-              >
-                Save changes
-              </button>
-            </footer>
+                <div class="settings-field">
+                  <label class="settings-label" for="textureSearch">
+                    <span>Overlay texture</span>
+                    <span class="sub">From /textures folder</span>
+                  </label>
+
+                  <!-- search bar -->
+                  <div class="texture-search-row">
+                    <div class="texture-search-input-wrap">
+                      <i class="fa-solid fa-magnifying-glass"></i>
+                      <input
+                        id="textureSearch"
+                        type="text"
+                        class="settings-input texture-search-input"
+                        placeholder="Search textures (e.g. paper, noise, grid)..."
+                      />
+                    </div>
+                  </div>
+
+                  <!-- suggested tags -->
+                  <div class="texture-suggestions" id="textureSuggestions">
+                    <button
+                      type="button"
+                      class="texture-tag"
+                      data-query="brick"
+                    >
+                      Brick / Wall
+                    </button>
+                    <button
+                      type="button"
+                      class="texture-tag"
+                      data-query="shattered"
+                    >
+                      Shattered / Glass
+                    </button>
+                    <button type="button" class="texture-tag" data-query="cube">
+                      Cubes / 3D
+                    </button>
+                    <button type="button" class="texture-tag" data-query="food">
+                      Food
+                    </button>
+                  </div>
+
+                  <!-- texture grid -->
+                  <div class="texture-grid" id="textureGrid">
+                    <!-- JS will populate from /textures -->
+                  </div>
+
+                  <!-- pagination -->
+                  <div class="texture-pagination" id="texturePagination">
+                    <button
+                      type="button"
+                      class="page-btn"
+                      data-dir="prev"
+                      aria-label="Previous textures page"
+                    >
+                      &laquo;
+                    </button>
+                    <div class="page-dots" id="texturePageDots"></div>
+                    <button
+                      type="button"
+                      class="page-btn"
+                      data-dir="next"
+                      aria-label="Next textures page"
+                    >
+                      &raquo;
+                    </button>
+                  </div>
+                </div>
+              </section>
+              <!-- END: Textures Section -->
+            </div>
+            <!-- END: Wrapper for scrollable content (Textures only) -->
+
+            <!-- END: Sticky Bottom Container -->
           </section>
         </div>
       </div>
     </main>
+    <!-- Save (STICKY on DESKTOP, regular on mobile) -->
+    <!-- preview bubble -->
+    <div class="settings-field preview-field-sticky">
+      <label class="settings-label">
+        <span>Preview</span>
+        <span class="sub"> Example chat bubble with selected texture </span>
+      </label>
+      <div class="bubble-preview-wrap">
+        <div class="bubble-preview bubble-preview-me" id="bubblePreview">
+          <span class="bubble-preview-text">
+            Bakal ako at Malaki ang Yabag ko
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <footer class="settings-footer">
+      <button type="button" id="settingsSaveBtn" class="settings-save-btn">
+        Save changes
+      </button>
+    </footer>
 
     <!-- Bootstrap 5 JS bundle (optional but recommended) -->
     <script
