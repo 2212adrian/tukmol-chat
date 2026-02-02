@@ -570,7 +570,6 @@ async function uploadAvatarIfNeeded(user) {
 }
 
 // ========= PASSWORD CHANGE =========
-
 async function handlePasswordChange(newPassword, confirmPassword) {
   if (!newPassword && !confirmPassword) return;
 
@@ -584,13 +583,24 @@ async function handlePasswordChange(newPassword, confirmPassword) {
     throw new Error('password_mismatch');
   }
 
-  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  // Optional: enforce your own minimum length before calling Supabase
+  if (newPassword.length < 3) {
+    showToast('Password must be at least 3 characters.', 'error');
+    throw new Error('password_too_short');
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
   if (error) {
-    logError('Failed to change password.', error);
+    console.error('Supabase updateUser error:', error);
+    showToast(error.message || 'Failed to change password.', 'error');
     throw error;
   }
 
   showToast('Changed Password Done!', 'success');
+  return data;
 }
 
 // ========= SAVE HANDLER =========
