@@ -9,6 +9,26 @@ const loginBtn = document.getElementById('loginBtn');
 // Supabase client from supabase-init.js
 const supabase2 = window.supabaseClient;
 
+async function redirectIfLoggedIn() {
+  try {
+    const {
+      data: { session },
+      error,
+    } = await supabase2.auth.getSession();
+    if (error) {
+      console.error('getSession error', error);
+      return;
+    }
+    if (session && session.user) {
+      window.location.href = 'index.html';
+    }
+  } catch (err) {
+    console.error('Failed to check session', err);
+  }
+}
+
+redirectIfLoggedIn();
+
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 

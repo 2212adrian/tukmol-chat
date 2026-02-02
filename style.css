@@ -1165,7 +1165,6 @@ body.dark-mode .message-actions {
   width: 300px;
   height: auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
   gap: 6px;
 }
 
@@ -1631,6 +1630,46 @@ body.dark-mode .reaction-picker-popup {
 
 /* ========= TYPING INDICATOR ========= */
 
+.typing-indicator {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s ease;
+}
+.typing-indicator.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.typing-indicator-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.typing-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: typingPulse 1.4s infinite;
+}
+@keyframes typingPulse {
+  0%,
+  60%,
+  100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  30% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+/* Stagger dots */
+.typing-indicator-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-indicator-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
 /* ========= RESPONSIVE ========= */
 
 @media (hover: hover) {
@@ -1661,6 +1700,7 @@ body.dark-mode .reaction-picker-popup {
 
   .message-bubble {
     max-width: 85%;
+    padding-bottom: 20px;
   }
 
   .message-image img {
@@ -2250,4 +2290,33 @@ body.dark-mode .reaction-picker-popup {
   box-shadow:
     0 12px 28px rgba(245, 158, 11, 0.75),
     0 0 0 1px rgba(250, 250, 250, 0.18);
+}
+
+.message-image-grid.single-image {
+  display: block;
+  padding: 0;
+  width: 100%;
+}
+
+.message-image-grid.single-image .message-image-cell {
+  width: 100%;
+  margin: 0;
+}
+
+.message-image-grid.single-image .message-image {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.message-image-grid.single-image img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  max-height: 420px; /* adjust as you like */
+}
+
+.reaction-remove-btn {
+  background-color: var(--antique-white);
 }
