@@ -383,6 +383,7 @@ function initializeApp() {
   }
 
   const REACTION_EVENT = 'reaction';
+  const READS_EVENT = 'reads_updated';
   let messageChangesChannel = null;
 
   function subscribeRealtime() {
@@ -452,6 +453,11 @@ function initializeApp() {
         }
 
         applyReactionToCacheAndUI(reaction);
+      })
+      .on('broadcast', { event: READS_EVENT }, ({ payload }) => {
+        const { room } = payload || {};
+        if (room && room !== ROOM_NAME) return;
+        loadMessageReads();
       })
       .subscribe();
   }
@@ -1901,6 +1907,13 @@ function initializeApp() {
       return;
     }
     loadMessageReads();
+    if (chatChannel) {
+      chatChannel.send({
+        type: 'broadcast',
+        event: READS_EVENT,
+        payload: { room: ROOM_NAME },
+      });
+    }
   }
 
   function getLatestMyMessageRow() {
