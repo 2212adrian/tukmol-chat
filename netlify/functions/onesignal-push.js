@@ -8,7 +8,9 @@ const handler = async (event) => {
   }
 
   try {
-    const { title, message, url } = JSON.parse(event.body || '{}');
+    const { title, message, url, include_player_ids } = JSON.parse(
+      event.body || '{}',
+    );
     if (!title || !message) {
       return {
         statusCode: 400,
@@ -30,11 +32,13 @@ const handler = async (event) => {
 
     const payload = {
       app_id: appId,
-      included_segments: ['Subscribed Users'],
       target_channel: 'push',
       headings: { en: title },
       contents: { en: message },
       url: url || undefined,
+      ...(Array.isArray(include_player_ids) && include_player_ids.length
+        ? { include_player_ids }
+        : { included_segments: ['Subscribed Users'] }),
     };
 
     const res = await fetch('https://onesignal.com/api/v1/notifications', {

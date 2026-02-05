@@ -612,6 +612,7 @@ function initializeApp() {
   let notificationsEnabled =
     localStorage.getItem('notifications_enabled') === 'true';
   let unreadNotifications = 0;
+  let oneSignalSubId = localStorage.getItem('onesignal_sub_id') || '';
 
   function updateNotificationBadge() {
     if (!notificationBadge) return;
@@ -703,6 +704,22 @@ function initializeApp() {
   applyNotificationToggleState();
   updateNotificationBadge();
   syncNotificationPermission();
+
+  if (window.OneSignalDeferred) {
+    OneSignalDeferred.push(function (OneSignal) {
+      try {
+        OneSignal.User?.PushSubscription?.addEventListener?.(
+          'change',
+          (event) => {
+            const currentId = event?.current?.id;
+            if (currentId) setOneSignalSubId(currentId);
+          },
+        );
+      } catch {
+        // ignore
+      }
+    });
+  }
   // hydrate sidebar/header avatar from auth metadata
   const userAvatarUrl = getAvatarUrlFromUser(CURRENT_USER);
   const userInitial = CURRENT_USERNAME.charAt(0).toUpperCase();
@@ -2576,6 +2593,13 @@ function initializeApp() {
     if (scroll) scrollToBottom();
   }
 
+  function setOneSignalSubId(id) {
+    if (id) {
+      oneSignalSubId = id;
+      localStorage.setItem('onesignal_sub_id', id);
+    }
+  }
+
   if (testPushBtn) {
     testPushBtn.addEventListener('click', async () => {
       try {
@@ -2585,6 +2609,7 @@ function initializeApp() {
           body: JSON.stringify({
             title: 'Test Push',
             message: 'This is a test notification from Tropang Tukmol.',
+            include_player_ids: oneSignalSubId ? [oneSignalSubId] : undefined,
           }),
         });
         const raw = await res.text();
@@ -3200,6 +3225,7 @@ function initializeApp() {
           body: JSON.stringify({
             title: `${channelName} • ${sender}`,
             message: preview,
+            include_player_ids: oneSignalSubId ? [oneSignalSubId] : undefined,
           }),
         });
         let payload = null;
