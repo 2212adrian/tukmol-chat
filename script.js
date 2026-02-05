@@ -597,7 +597,6 @@ function initializeApp() {
   const notificationPanel = document.getElementById('notificationPanel');
   const notificationList = document.getElementById('notificationList');
   const markAllReadBtn = document.getElementById('markAllReadBtn');
-  const testPushBtn = document.getElementById('testPushBtn');
   const textFieldContainer = document.querySelector('.text-field-container');
   const sidebarUsername = document.getElementById('sidebarUsername');
   const onlineUsersContainer = document.getElementById('onlineUsersContainer');
@@ -2620,49 +2619,6 @@ function initializeApp() {
     });
   }
 
-  if (testPushBtn) {
-    testPushBtn.addEventListener('click', async () => {
-      try {
-        const res = await fetch('/.netlify/functions/onesignal-push', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: 'Test Push',
-            message: 'This is a test notification from Tropang Tukmol.',
-            include_player_ids: oneSignalSubId ? [oneSignalSubId] : undefined,
-            include_external_user_ids: session?.user?.id
-              ? [session.user.id]
-              : undefined,
-          }),
-        });
-        const raw = await res.text();
-        let payload = null;
-        try {
-          payload = raw ? JSON.parse(raw) : null;
-        } catch {
-          payload = null;
-        }
-        if (!res.ok) {
-          showToast(
-            'Test push failed: ' + (payload?.error || raw || 'Unknown error'),
-            'error',
-          );
-        } else {
-          const recipients =
-            payload?.data?.recipients ?? payload?.recipients ?? '';
-          //showToast(
-          //  `Test push queued.${recipients ? ` Recipients: ${recipients}` : ''}`,
-          //  'success',
-          //);
-        }
-      } catch (err) {
-        showToast(
-          'Test push error: ' + (err.message || 'Unknown error'),
-          'error',
-        );
-      }
-    });
-  }
 
   // === LOAD INITIAL MESSAGES ===
   async function loadMessages() {
