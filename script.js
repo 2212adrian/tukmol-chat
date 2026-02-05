@@ -1961,24 +1961,6 @@ function initializeApp() {
 
     if (!seenUsers.length) return;
 
-    if (notificationList) {
-      const seenIds = new Set(seenUsers.map((u) => u.user_id));
-      const items = Array.from(
-        notificationList.querySelectorAll('.notification-item'),
-      );
-      let removed = 0;
-      items.forEach((item) => {
-        if (seenIds.has(item.dataset.senderId)) {
-          item.remove();
-          removed += 1;
-        }
-      });
-      if (removed > 0) {
-        unreadNotifications = Math.max(0, unreadNotifications - removed);
-        updateNotificationBadge();
-      }
-    }
-
     const container = document.createElement('div');
     container.className = 'seen-bubbles';
 
@@ -2102,8 +2084,6 @@ function initializeApp() {
     item.className = 'notification-item';
     item.dataset.messageId = msg.id;
     item.dataset.roomName = msg.room_name || ROOM_NAME;
-    item.dataset.senderId = msg.user_id || '';
-    item.dataset.senderName = sender;
 
     const title = document.createElement('div');
     title.className = 'notification-item-title';
