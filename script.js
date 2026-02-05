@@ -3203,10 +3203,6 @@ function initializeApp() {
           body: JSON.stringify({
             title: `${channelName} • ${sender}`,
             message: preview,
-            include_player_ids: oneSignalSubId ? [oneSignalSubId] : undefined,
-            include_external_user_ids: session?.user?.id
-              ? [session.user.id]
-              : undefined,
           }),
         });
         let payload = null;
