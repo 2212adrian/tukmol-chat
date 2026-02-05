@@ -8,7 +8,7 @@ const handler = async (event) => {
   }
 
   try {
-    const { title, message, url, include_player_ids } = JSON.parse(
+    const { title, message, url, include_player_ids, include_external_user_ids } = JSON.parse(
       event.body || '{}',
     );
     if (!title || !message) {
@@ -38,7 +38,9 @@ const handler = async (event) => {
       url: url || undefined,
       ...(Array.isArray(include_player_ids) && include_player_ids.length
         ? { include_player_ids }
-        : { included_segments: ['Subscribed Users'] }),
+        : Array.isArray(include_external_user_ids) && include_external_user_ids.length
+          ? { include_external_user_ids }
+          : { included_segments: ['Subscribed Users'] }),
     };
 
     const res = await fetch('https://onesignal.com/api/v1/notifications', {
