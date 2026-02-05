@@ -3148,6 +3148,22 @@ function initializeApp() {
       renderMessage(data, atBottom, false);
       if (!atBottom) newMsgBtn.style.display = 'block';
 
+      try {
+        const channelName = itemDisplayNameForRoom(ROOM_NAME);
+        const sender = userDisplayName || CURRENT_USER.email || 'Someone';
+        const preview = getNotificationText(data) || 'New message';
+        await fetch('/.netlify/functions/onesignal-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `${channelName} • ${sender}`,
+            message: preview,
+          }),
+        });
+      } catch (err) {
+        console.error('Push send failed', err);
+      }
+
       await chatChannel.send({
         type: 'broadcast',
         event: 'message',
