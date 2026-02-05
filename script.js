@@ -3167,7 +3167,17 @@ function initializeApp() {
             'error',
           );
         } else {
-          showToast('Push queued.', 'success');
+          let info = '';
+          try {
+            const parsed = JSON.parse(resText);
+            const recipients = parsed?.data?.recipients ?? parsed?.recipients;
+            if (Number.isFinite(recipients)) {
+              info = ` Recipients: ${recipients}`;
+            }
+          } catch {
+            // ignore parse errors
+          }
+          showToast(`Push queued.${info}`, 'success');
         }
       } catch (err) {
         showToast(
