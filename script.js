@@ -660,10 +660,6 @@ function initializeApp() {
     notificationBtn.addEventListener('click', () => {
       const isHidden = notificationPanel?.hidden ?? true;
       setNotificationPanelVisible(isHidden);
-      if (!isHidden && unreadNotifications > 0) {
-        unreadNotifications = 0;
-        updateNotificationBadge();
-      }
     });
   }
 

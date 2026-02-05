@@ -1315,6 +1315,10 @@ body.dark-mode .notification-btn {
   justify-content: center;
 }
 
+.notification-badge[hidden] {
+  display: none !important;
+}
+
 .notification-panel {
   position: absolute;
   top: 74px;
