@@ -112,6 +112,7 @@
           <button id="settingsBtn" class="sidebar-pill settings-btn">
             <i class="fa-solid fa-gear"></i><span>Settings</span>
           </button>
+          <div class="sidebar-version">v1.2.0</div>
           <button id="logoutBtn" class="sidebar-pill logout-btn">
             <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
           </button>
@@ -160,6 +161,12 @@
           </div>
         </header>
 
+        <div
+          id="notificationArea"
+          class="notification-area"
+          aria-live="polite"
+        ></div>
+
         <!-- Messages Container -->
         <div
           id="messages"
@@ -190,7 +197,21 @@
               <div class="drag-text-sub">You can add up to 4 images</div>
             </div>
           </div>
-
+          <div id="replyPreview" class="reply-preview" hidden>
+            <div class="reply-preview-content">
+              <div class="reply-preview-label">Replying to</div>
+              <div id="replyPreviewName" class="reply-preview-name"></div>
+              <div id="replyPreviewText" class="reply-preview-text"></div>
+            </div>
+            <button
+              id="cancelReplyBtn"
+              class="reply-cancel-btn"
+              type="button"
+              title="Cancel reply"
+            >
+              x
+            </button>
+          </div>
           <div class="input-wrapper">
             <label for="imageInput" class="attach-btn">+</label>
             <input type="file" id="imageInput" accept="image/*" hidden />
@@ -287,3 +308,4 @@
     <link rel="stylesheet" href="style.css" />
   </body>
 </html>
+

@@ -1003,6 +1003,41 @@ body.dark-mode .chat-header {
   font-size: 14px;
 }
 
+.message-reply-preview {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  text-align: left;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  color: inherit;
+}
+
+#replyPreviewName {
+  color: var(--reaction-popup-bg);
+}
+
+.message-reply-label {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.message-reply-text {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.message-row.message-highlight .message-bubble {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 10px 24px rgba(15, 23, 42, 0.18);
+}
+
 /* let JS-controlled bubble color flow down */
 .message-username {
   display: block;
@@ -1044,6 +1079,85 @@ body.dark-mode .chat-header {
 /* subtle time color tweak for others if desired */
 .message-row.other .message-time {
   color: var(--text-subtle);
+}
+
+/* ========= IN-APP NOTIFICATIONS ========= */
+
+.notification-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px 0;
+}
+
+.notification-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f2937;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.15);
+  animation: notifySlideIn 200ms ease-out;
+}
+
+body.dark-mode .notification-card {
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+
+.notification-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.notification-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notification-subtitle {
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+.notification-message {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notification-close {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: inherit;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.notification-close:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+@keyframes notifySlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ========= MESSAGE ACTIONS ========= */
@@ -1455,6 +1569,64 @@ body.dark-mode .reaction-picker-popup {
     border-color 0.25s ease;
 }
 
+.reply-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-left: 4px solid var(--primary);
+  border-radius: 12px;
+  background: var(--bg-input);
+}
+
+.reply-preview[hidden] {
+  display: none !important;
+}
+
+.reply-preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.reply-preview-label {
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+.reply-preview-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reply-preview-text {
+  font-size: 12px;
+  color: var(--text-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reply-cancel-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--text-subtle);
+  transition:
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.reply-cancel-btn:hover {
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
 .input-wrapper {
   display: flex;
   align-items: center;
@@ -1823,6 +1995,10 @@ body.dark-mode .reaction-picker-popup {
 
 /* PC: Always centered */
 @media (min-width: 769px) {
+  .emoji-picker {
+    top: -360px;
+    left: -375px;
+  }
   .typing-indicator {
     left: 50% !important;
     transform: translateX(-50%) translateY(100%) !important;
@@ -1837,6 +2013,10 @@ body.dark-mode .reaction-picker-popup {
 
 /* MOBILE: Left-aligned */
 @media (max-width: 768px) {
+  .emoji-picker {
+    top: -360px !important;
+    left: -375px !important;
+  }
   .typing-indicator {
     left: 20px !important;
     right: 20px !important;
@@ -1924,9 +2104,18 @@ body.dark-mode .reaction-picker-popup {
     font-size: 0.78rem;
   }
 
-  .sidebar-pill span {
-    white-space: nowrap;
-  }
+.sidebar-pill span {
+  white-space: nowrap;
+}
+
+.sidebar-version {
+  margin: 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  letter-spacing: 0.2px;
+}
 }
 
 /* ========= DRAG & DROP ========= */

@@ -408,6 +408,7 @@ function initializeApp() {
         const atBottom = isNearBottom();
         renderMessage(msg, atBottom, false);
         if (!atBottom) newMsgBtn.style.display = 'block';
+        handleIncomingNotification(msg);
       })
       // === NEW LISTENER: Handle explicit broadcast for deleted messages ===
       .on('broadcast', { event: 'message_deleted' }, ({ payload }) => {
@@ -486,12 +487,13 @@ function initializeApp() {
         (payload) => {
           console.log('[MSG CHANGE]', payload);
 
-          if (payload.eventType === 'INSERT') {
-            const msg = payload.new;
-            const atBottom = isNearBottom();
-            renderMessage(msg, atBottom, false);
-            if (!atBottom) newMsgBtn.style.display = 'block';
-          } else if (payload.eventType === 'UPDATE') {
+        if (payload.eventType === 'INSERT') {
+          const msg = payload.new;
+          const atBottom = isNearBottom();
+          renderMessage(msg, atBottom, false);
+          if (!atBottom) newMsgBtn.style.display = 'block';
+          handleIncomingNotification(msg);
+        } else if (payload.eventType === 'UPDATE') {
             const msg = payload.new;
             if (msg.deleted_at) {
               applyDeletedMessageToUI(msg); // show "<name> just deleted this message"
@@ -575,12 +577,22 @@ function initializeApp() {
   const emojiBtn = document.getElementById('emojiBtn');
   const cancelEditBtn = document.getElementById('cancelEditBtn');
   const emojiSuggestionsEl = document.getElementById('emojiSuggestions');
+  const replyPreviewEl = document.getElementById('replyPreview');
+  const replyPreviewNameEl = document.getElementById('replyPreviewName');
+  const replyPreviewTextEl = document.getElementById('replyPreviewText');
+  const cancelReplyBtn = document.getElementById('cancelReplyBtn');
+  const notificationArea = document.getElementById('notificationArea');
   const textFieldContainer = document.querySelector('.text-field-container');
   const sidebarUsername = document.getElementById('sidebarUsername');
   const headerUserAvatar = document.getElementById('headerUserAvatar');
   const onlineUsersContainer = document.getElementById('onlineUsersContainer');
   if (sidebarUsername) sidebarUsername.textContent = CURRENT_USERNAME;
 
+  if (cancelReplyBtn) {
+    cancelReplyBtn.addEventListener('click', () => {
+      clearReplyTarget();
+    });
+  }
   // hydrate sidebar/header avatar from auth metadata
   const userAvatarUrl = getAvatarUrlFromUser(CURRENT_USER);
   const userInitial = CURRENT_USERNAME.charAt(0).toUpperCase();
@@ -627,6 +639,7 @@ function initializeApp() {
     if (!supabaseClient) return;
 
     ROOM_NAME = newRoom;
+    clearReplyTarget();
 
     // 1) Leave old presence channel
     if (presenceChannel) {
@@ -1603,6 +1616,192 @@ function initializeApp() {
     return null;
   }
 
+  function getReplyPreviewText(msg) {
+    if (!msg || msg.deleted_at) return 'Message deleted';
+
+    const raw = typeof msg.content === 'string' ? msg.content.trim() : '';
+    if (raw && raw !== '[image]') return raw;
+
+    const hasImages =
+      (Array.isArray(msg.image_urls) && msg.image_urls.length) || msg.image_url;
+    if (hasImages) return '[image]';
+
+    return raw || '';
+  }
+
+  function clampReplyText(text, maxLen = 140) {
+    if (!text) return '';
+    if (text.length <= maxLen) return text;
+    return text.slice(0, Math.max(0, maxLen - 3)) + '...';
+  }
+
+  let replyingTo = null;
+
+  function updateReplyPreviewUI() {
+    if (!replyPreviewEl) return;
+    if (!replyingTo) {
+      replyPreviewEl.hidden = true;
+      if (replyPreviewNameEl) replyPreviewNameEl.textContent = '';
+      if (replyPreviewTextEl) replyPreviewTextEl.textContent = '';
+      return;
+    }
+
+    replyPreviewEl.hidden = false;
+    if (replyPreviewNameEl) replyPreviewNameEl.textContent = replyingTo.user;
+    if (replyPreviewTextEl)
+      replyPreviewTextEl.textContent = replyingTo.preview;
+  }
+
+  function setReplyTarget(msg, displayName) {
+    if (!msg) return;
+    if (editingMessage) cancelEdit();
+
+    const previewText = clampReplyText(getReplyPreviewText(msg));
+    replyingTo = {
+      id: msg.id,
+      user: displayName || msg.user_name || 'Unknown',
+      preview: previewText || 'Message',
+    };
+
+    updateReplyPreviewUI();
+    messageInput?.focus();
+  }
+
+  function clearReplyTarget() {
+    replyingTo = null;
+    updateReplyPreviewUI();
+  }
+
+  function scrollToMessage(messageId) {
+    if (!messagesEl || !messageId) return;
+    const row = messagesEl.querySelector(
+      `.message-row[data-message-id="${messageId}"]`,
+    );
+    if (!row) {
+      showToast('Original message not loaded yet.', 'info');
+      return;
+    }
+
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.add('message-highlight');
+    setTimeout(() => row.classList.remove('message-highlight'), 1200);
+  }
+
+  const notifiedMessageIds = new Set();
+
+  function getNotificationText(msg) {
+    if (!msg || msg.deleted_at) return '';
+    const raw = typeof msg.content === 'string' ? msg.content.trim() : '';
+    if (raw && raw !== '[image]') return raw;
+    const hasImages =
+      (Array.isArray(msg.image_urls) && msg.image_urls.length) || msg.image_url;
+    if (hasImages) return '[image]';
+    return raw || '';
+  }
+
+  function showInAppNotification(msg) {
+    if (!notificationArea || !msg) return;
+
+    const channelName = itemDisplayNameForRoom(msg.room_name || ROOM_NAME);
+    const sender =
+      msg.user_meta?.display_name || msg.user_name || msg.user_email || 'Unknown';
+    const preview = getNotificationText(msg) || 'New message';
+
+    const card = document.createElement('div');
+    card.className = 'notification-card';
+
+    const content = document.createElement('div');
+    content.className = 'notification-content';
+
+    const title = document.createElement('div');
+    title.className = 'notification-title';
+    title.textContent = channelName;
+
+    const subtitle = document.createElement('div');
+    subtitle.className = 'notification-subtitle';
+    subtitle.textContent = sender;
+
+    const message = document.createElement('div');
+    message.className = 'notification-message';
+    message.textContent = preview;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'notification-close';
+    closeBtn.textContent = 'x';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      card.remove();
+    });
+
+    content.appendChild(title);
+    content.appendChild(subtitle);
+    content.appendChild(message);
+    card.appendChild(content);
+    card.appendChild(closeBtn);
+
+    card.addEventListener('click', async () => {
+      if (msg.room_name && msg.room_name !== ROOM_NAME) {
+        await switchRoom(msg.room_name);
+      }
+      scrollToMessage(msg.id);
+      card.remove();
+    });
+
+    notificationArea.prepend(card);
+
+    setTimeout(() => {
+      card.remove();
+    }, 8000);
+  }
+
+  async function ensureNotificationPermission() {
+    if (!('Notification' in window)) return 'unsupported';
+    if (Notification.permission === 'default') {
+      try {
+        return await Notification.requestPermission();
+      } catch {
+        return Notification.permission;
+      }
+    }
+    return Notification.permission;
+  }
+
+  async function showBrowserNotification(msg) {
+    if (!msg || msg.deleted_at) return;
+    if (!('Notification' in window)) return;
+
+    const permission = await ensureNotificationPermission();
+    if (permission !== 'granted') return;
+
+    const channelName = itemDisplayNameForRoom(msg.room_name || ROOM_NAME);
+    const sender =
+      msg.user_meta?.display_name || msg.user_name || msg.user_email || 'Unknown';
+    const preview = getNotificationText(msg) || 'New message';
+
+    const title = `${channelName} • ${sender}`;
+    try {
+      new Notification(title, {
+        body: preview,
+        tag: msg.id,
+      });
+    } catch {
+      // ignore notification failures
+    }
+  }
+
+  function handleIncomingNotification(msg) {
+    if (!msg || msg.user_id === session.user.id) return;
+    if (msg.deleted_at) return;
+
+    if (notifiedMessageIds.has(msg.id)) return;
+    notifiedMessageIds.add(msg.id);
+    setTimeout(() => notifiedMessageIds.delete(msg.id), 60000);
+
+    showInAppNotification(msg);
+    showBrowserNotification(msg);
+  }
+
   // === MESSAGE RENDERING ===
   function createMessageRow(msg) {
     const { isMe, profile, meta, bgColor, textColor } =
@@ -1715,6 +1914,14 @@ function initializeApp() {
 
     const actions = document.createElement('div');
     actions.className = 'message-actions';
+    if (!msg.deleted_at) {
+      const replyBtn = document.createElement('button');
+      replyBtn.className = 'message-action-btn reply-btn';
+      replyBtn.textContent = 'Reply';
+      replyBtn.onclick = () => setReplyTarget(msg, displayName);
+      actions.appendChild(replyBtn);
+    }
+
     if (isMe && !msg.deleted_at) {
       const editBtn = document.createElement('button');
       editBtn.className = 'message-action-btn edit-btn';
@@ -1739,6 +1946,31 @@ function initializeApp() {
       badge.className = 'edit-badge';
       badge.textContent = 'edited';
       header.appendChild(badge);
+    }
+
+    if (!msg.deleted_at && msg.reply_to_id) {
+      const replyPreview = document.createElement('button');
+      replyPreview.type = 'button';
+      replyPreview.className = 'message-reply-preview';
+
+      const replyLabel = document.createElement('div');
+      replyLabel.className = 'message-reply-label';
+      replyLabel.textContent = `Replying to ${
+        msg.reply_to_user_name || 'message'
+      }`;
+
+      const replyText = document.createElement('div');
+      replyText.className = 'message-reply-text';
+      replyText.textContent = msg.reply_to_content || '';
+
+      replyPreview.appendChild(replyLabel);
+      replyPreview.appendChild(replyText);
+      replyPreview.addEventListener('click', (e) => {
+        e.stopPropagation();
+        scrollToMessage(msg.reply_to_id);
+      });
+
+      bubble.appendChild(replyPreview);
     }
 
     // MESSAGE TEXT + GIF / IMAGE HANDLING
@@ -2050,6 +2282,8 @@ function initializeApp() {
       showToast('You can only EDIT messages within 5 minutes.', 'warning');
       return;
     }
+
+    clearReplyTarget();
 
     let contentToEdit = MESSAGE_CONTENT_CACHE[msg.id];
 
@@ -2370,6 +2604,14 @@ function initializeApp() {
       const hasText = processedText.trim().length > 0;
       const hasImages = uploadedUrls.length > 0;
 
+      const replyPayload = replyingTo
+        ? {
+            reply_to_id: replyingTo.id,
+            reply_to_user_name: replyingTo.user,
+            reply_to_content: replyingTo.preview,
+          }
+        : {};
+
       const payload = {
         room_name: ROOM_NAME,
         user_id: CURRENT_USER.id,
@@ -2386,6 +2628,7 @@ function initializeApp() {
         type: hasImages ? 'image' : 'text',
         image_url: uploadedUrls[0] || null,
         image_urls: hasImages ? uploadedUrls : null,
+        ...replyPayload,
       };
 
       const { data, error } = await supabaseClient
@@ -2405,6 +2648,8 @@ function initializeApp() {
         event: 'message',
         payload: data,
       });
+
+      clearReplyTarget();
     } catch (err) {
       logError('Send error (full object)', err);
       showToast('Failed to send: ' + (err.message || 'Unknown error'), 'error');
@@ -2473,6 +2718,12 @@ function initializeApp() {
       cancelEdit();
       hideEmojiSuggestions();
       showToast('Edit cancelled.', 'info');
+    }
+    if (e.key === 'Escape' && replyingTo) {
+      e.preventDefault();
+      clearReplyTarget();
+      hideEmojiSuggestions();
+      showToast('Reply cancelled.', 'info');
     }
   });
 
