@@ -495,15 +495,15 @@ function initializeApp() {
         (payload) => {
           console.log('[MSG CHANGE]', payload);
 
-        if (payload.eventType === 'INSERT') {
-          const msg = payload.new;
-          msg._notify = true;
-          const atBottom = isNearBottom();
-          renderMessage(msg, atBottom, false);
-          if (!atBottom) newMsgBtn.style.display = 'block';
-          handleIncomingNotification(msg);
-          markMySeen();
-        } else if (payload.eventType === 'UPDATE') {
+          if (payload.eventType === 'INSERT') {
+            const msg = payload.new;
+            msg._notify = true;
+            const atBottom = isNearBottom();
+            renderMessage(msg, atBottom, false);
+            if (!atBottom) newMsgBtn.style.display = 'block';
+            handleIncomingNotification(msg);
+            markMySeen();
+          } else if (payload.eventType === 'UPDATE') {
             const msg = payload.new;
             if (msg.deleted_at) {
               applyDeletedMessageToUI(msg); // show "<name> just deleted this message"
@@ -2644,17 +2644,16 @@ function initializeApp() {
         }
         if (!res.ok) {
           showToast(
-            'Test push failed: ' +
-              (payload?.error || raw || 'Unknown error'),
+            'Test push failed: ' + (payload?.error || raw || 'Unknown error'),
             'error',
           );
         } else {
           const recipients =
             payload?.data?.recipients ?? payload?.recipients ?? '';
-          showToast(
-            `Test push queued.${recipients ? ` Recipients: ${recipients}` : ''}`,
-            'success',
-          );
+          //showToast(
+          //  `Test push queued.${recipients ? ` Recipients: ${recipients}` : ''}`,
+          //  'success',
+          //);
         }
       } catch (err) {
         showToast(
@@ -3276,7 +3275,9 @@ function initializeApp() {
             payload?.data?.recipients ??
             payload?.data?.id ??
             payload?.recipients;
-          const info = recipients ? ` Recipients: ${recipients}` : ' (no recipients)';
+          const info = recipients
+            ? ` Recipients: ${recipients}`
+            : ' (no recipients)';
           showToast(`Push queued.${info}`, 'success');
         }
       } catch (err) {
