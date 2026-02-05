@@ -2427,14 +2427,20 @@ body.dark-mode .reaction-picker-popup {
     white-space: nowrap;
   }
 
-  .sidebar-version {
-    margin: 2px 0;
-    font-size: 12px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.85);
-    text-align: center;
-    letter-spacing: 0.2px;
-  }
+.sidebar-version {
+  margin: 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+
+.notification-test-btn {
+  margin: 0 12px 8px;
+  justify-content: center;
+  gap: 8px;
+}
 }
 
 /* ========= DRAG & DROP ========= */
