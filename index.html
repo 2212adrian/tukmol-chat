@@ -105,6 +105,14 @@
           </div>
         </div>
 
+        <div class="sidebar-notify-toggle">
+          <span>Notifications</span>
+          <label class="switch">
+            <input id="notificationToggle" type="checkbox" checked />
+            <span class="slider"></span>
+          </label>
+        </div>
+
         <div class="sidebar-footer">
           <button id="installPwaBtn" class="sidebar-pill install-btn">
             <span>Download app</span>
@@ -112,7 +120,7 @@
           <button id="settingsBtn" class="sidebar-pill settings-btn">
             <i class="fa-solid fa-gear"></i><span>Settings</span>
           </button>
-          <div class="sidebar-version">v1.2.0</div>
+          <div class="sidebar-version">v1.4.0</div>
           <button id="logoutBtn" class="sidebar-pill logout-btn">
             <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
           </button>
@@ -148,7 +156,6 @@
             >
               ☰
             </button>
-            <div id="headerUserAvatar" class="header-avatar"></div>
             <div class="header-info">
               <h2 id="roomNameHeader">General</h2>
               <div class="status"><span class="dot"></span> Online</div>
@@ -156,16 +163,27 @@
           </div>
           <div class="header-right">
             <button class="icon-btn-ghost"></button>
+            <button
+              id="notificationBtn"
+              class="notification-btn"
+              title="Notifications"
+            >
+              <i class="fa-solid fa-bell"></i>
+              <span id="notificationBadge" class="notification-badge" hidden
+                >0</span
+              >
+            </button>
             <button id="refreshChatBtn" title="Refresh chat">⟳</button>
             <button id="themeToggle">🌙</button>
           </div>
         </header>
-
-        <div
-          id="notificationArea"
-          class="notification-area"
-          aria-live="polite"
-        ></div>
+        <div id="notificationPanel" class="notification-panel" hidden>
+          <div class="notification-panel-header">
+            <span>Notifications</span>
+            <button id="markAllReadBtn" type="button">Mark all read</button>
+          </div>
+          <div id="notificationList" class="notification-list"></div>
+        </div>
 
         <!-- Messages Container -->
         <div
@@ -308,4 +326,3 @@
     <link rel="stylesheet" href="style.css" />
   </body>
 </html>
-

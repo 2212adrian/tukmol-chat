@@ -216,7 +216,10 @@ function initializeApp() {
   let loadingOlder = false;
   const PAGE_SIZE = 20;
   let lastRenderedUserName = null;
+  let lastRenderedDateKey = null;
   let attachedImages = [];
+  let messageReadsByUserId = {};
+  let readChangesChannel = null;
 
   const EMOJI_DICT = window.EMOJI_DICT || [];
 
@@ -409,6 +412,7 @@ function initializeApp() {
         renderMessage(msg, atBottom, false);
         if (!atBottom) newMsgBtn.style.display = 'block';
         handleIncomingNotification(msg);
+        markMySeen();
       })
       // === NEW LISTENER: Handle explicit broadcast for deleted messages ===
       .on('broadcast', { event: 'message_deleted' }, ({ payload }) => {
@@ -493,6 +497,7 @@ function initializeApp() {
           renderMessage(msg, atBottom, false);
           if (!atBottom) newMsgBtn.style.display = 'block';
           handleIncomingNotification(msg);
+          markMySeen();
         } else if (payload.eventType === 'UPDATE') {
             const msg = payload.new;
             if (msg.deleted_at) {
@@ -581,10 +586,14 @@ function initializeApp() {
   const replyPreviewNameEl = document.getElementById('replyPreviewName');
   const replyPreviewTextEl = document.getElementById('replyPreviewText');
   const cancelReplyBtn = document.getElementById('cancelReplyBtn');
-  const notificationArea = document.getElementById('notificationArea');
+  const notificationToggle = document.getElementById('notificationToggle');
+  const notificationBtn = document.getElementById('notificationBtn');
+  const notificationBadge = document.getElementById('notificationBadge');
+  const notificationPanel = document.getElementById('notificationPanel');
+  const notificationList = document.getElementById('notificationList');
+  const markAllReadBtn = document.getElementById('markAllReadBtn');
   const textFieldContainer = document.querySelector('.text-field-container');
   const sidebarUsername = document.getElementById('sidebarUsername');
-  const headerUserAvatar = document.getElementById('headerUserAvatar');
   const onlineUsersContainer = document.getElementById('onlineUsersContainer');
   if (sidebarUsername) sidebarUsername.textContent = CURRENT_USERNAME;
 
@@ -593,21 +602,79 @@ function initializeApp() {
       clearReplyTarget();
     });
   }
+
+  let notificationsEnabled =
+    localStorage.getItem('notifications_enabled') !== 'false';
+  let unreadNotifications = 0;
+
+  function updateNotificationBadge() {
+    if (!notificationBadge) return;
+    if (unreadNotifications > 0) {
+      notificationBadge.hidden = false;
+      notificationBadge.textContent =
+        unreadNotifications > 99 ? '99+' : String(unreadNotifications);
+    } else {
+      notificationBadge.hidden = true;
+      notificationBadge.textContent = '0';
+    }
+  }
+
+  function setNotificationPanelVisible(visible) {
+    if (!notificationPanel) return;
+    notificationPanel.hidden = !visible;
+  }
+
+  function applyNotificationToggleState() {
+    if (notificationToggle) {
+      notificationToggle.checked = notificationsEnabled;
+    }
+    if (notificationBtn) {
+      notificationBtn.style.display = notificationsEnabled
+        ? 'inline-flex'
+        : 'none';
+    }
+    if (!notificationsEnabled) {
+      setNotificationPanelVisible(false);
+    }
+  }
+
+  if (notificationToggle) {
+    notificationToggle.addEventListener('change', () => {
+      notificationsEnabled = notificationToggle.checked;
+      localStorage.setItem(
+        'notifications_enabled',
+        notificationsEnabled ? 'true' : 'false',
+      );
+      applyNotificationToggleState();
+    });
+  }
+
+  if (notificationBtn) {
+    notificationBtn.addEventListener('click', () => {
+      const isHidden = notificationPanel?.hidden ?? true;
+      setNotificationPanelVisible(isHidden);
+      if (!isHidden && unreadNotifications > 0) {
+        unreadNotifications = 0;
+        updateNotificationBadge();
+      }
+    });
+  }
+
+  if (markAllReadBtn) {
+    markAllReadBtn.addEventListener('click', () => {
+      if (notificationList) {
+        notificationList.innerHTML = '';
+      }
+      unreadNotifications = 0;
+      updateNotificationBadge();
+    });
+  }
+
+  applyNotificationToggleState();
+  updateNotificationBadge();
   // hydrate sidebar/header avatar from auth metadata
   const userAvatarUrl = getAvatarUrlFromUser(CURRENT_USER);
   const userInitial = CURRENT_USERNAME.charAt(0).toUpperCase();
-
-  if (headerUserAvatar) {
-    headerUserAvatar.innerHTML = '';
-    if (userAvatarUrl) {
-      const img = document.createElement('img');
-      img.src = userAvatarUrl;
-      img.alt = CURRENT_USERNAME;
-      headerUserAvatar.appendChild(img);
-    } else {
-      headerUserAvatar.textContent = userInitial;
-    }
-  }
 
   // apply chat background color + texture from metadata
   //const userBgColor = getUserChatBgColor(CURRENT_USER);
@@ -640,6 +707,7 @@ function initializeApp() {
 
     ROOM_NAME = newRoom;
     clearReplyTarget();
+    messageReadsByUserId = {};
 
     // 1) Leave old presence channel
     if (presenceChannel) {
@@ -656,6 +724,14 @@ function initializeApp() {
       supabaseClient.removeChannel(reactionChangesChannel);
       reactionChangesChannel = null;
     }
+    if (readChangesChannel) {
+      supabaseClient.removeChannel(readChangesChannel);
+      readChangesChannel = null;
+    }
+    if (readChangesChannel) {
+      supabaseClient.removeChannel(readChangesChannel);
+      readChangesChannel = null;
+    }
 
     // 3) Clear cache + UI
     if (window.MESSAGE_REACTIONS) {
@@ -668,12 +744,15 @@ function initializeApp() {
     // 4) Load new room data from DB
     await loadMessages(); // uses ROOM_NAME internally
     await loadInitialReactions(); // uses ROOM_NAME internally
+    await loadMessageReads();
 
     // 5) Re‑subscribe realtime & presence for the new room
     subscribeRealtime(); // messages + typing + REACTION_EVENT (broadcast)
     subscribeMessageChanges(); // 👈 CALL the function
     subscribeReactionTableChanges(); // EITHER keep this OR broadcast, not both
+    subscribeMessageReads();
     await setupPresence(); // presence for ROOM_NAME
+    markMySeen();
 
     // 6) Update header UI
     if (roomNameHeader) {
@@ -1616,6 +1695,189 @@ function initializeApp() {
     return null;
   }
 
+  function getDateKey(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function formatDateLabel(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '';
+    const months = [
+      'Jan.',
+      'Feb.',
+      'Mar.',
+      'Apr.',
+      'May',
+      'Jun.',
+      'Jul.',
+      'Aug.',
+      'Sep.',
+      'Oct.',
+      'Nov.',
+      'Dec.',
+    ];
+    const month = months[d.getMonth()];
+    return `${month} ${d.getDate()}, ${d.getFullYear()}`;
+  }
+
+  function createDateDivider(dateStr) {
+    const dateKey = getDateKey(dateStr);
+    const label = formatDateLabel(dateStr);
+    if (!dateKey || !label) return null;
+    const divider = document.createElement('div');
+    divider.className = 'date-divider';
+    divider.dataset.dateKey = dateKey;
+    divider.textContent = label;
+    return divider;
+  }
+
+  async function loadMessageReads() {
+    if (!supabaseClient) return;
+    const { data, error } = await supabaseClient
+      .from('message_reads')
+      .select('user_id, user_name, last_seen_at, room_name')
+      .eq('room_name', ROOM_NAME);
+
+    if (error) {
+      console.error('Load message reads error', error);
+      return;
+    }
+
+    messageReadsByUserId = {};
+    (data || []).forEach((row) => {
+      if (row?.user_id) messageReadsByUserId[row.user_id] = row;
+    });
+
+    const ids = Object.keys(messageReadsByUserId).filter(
+      (id) => !profilesByUserId[id],
+    );
+    if (ids.length) {
+      const { data: profilesData, error: profilesError } =
+        await supabaseClient
+          .from('profiles')
+          .select('id, avatar_url, display_name, email')
+          .in('id', ids);
+      if (!profilesError && profilesData) {
+        profilesData.forEach((p) => {
+          profilesByUserId[p.id] = p;
+        });
+      }
+    }
+
+    renderSeenBubbles();
+  }
+
+  function subscribeMessageReads() {
+    if (!supabaseClient) return;
+    if (readChangesChannel) {
+      supabaseClient.removeChannel(readChangesChannel);
+      readChangesChannel = null;
+    }
+
+    readChangesChannel = supabaseClient
+      .channel(`room:${ROOM_NAME}:reads`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'message_reads',
+          filter: `room_name=eq.${ROOM_NAME}`,
+        },
+        (payload) => {
+          const row = payload.new || payload.old;
+          if (!row?.user_id) return;
+          messageReadsByUserId[row.user_id] = row;
+          renderSeenBubbles();
+        },
+      )
+      .subscribe();
+  }
+
+  async function markMySeen() {
+    if (!supabaseClient || !session?.user) return;
+    if (document.visibilityState !== 'visible') return;
+
+    const payload = {
+      room_name: ROOM_NAME,
+      user_id: session.user.id,
+      user_name: getDisplayNameFromUser(session.user),
+      last_seen_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabaseClient
+      .from('message_reads')
+      .upsert(payload, { onConflict: 'room_name,user_id' });
+
+    if (error) console.error('Update message read error', error);
+  }
+
+  function getLatestMyMessageRow() {
+    if (!messagesEl) return null;
+    const rows = messagesEl.querySelectorAll('.message-row.me');
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      const row = rows[i];
+      if (!row.classList.contains('message-deleted')) return row;
+    }
+    return null;
+  }
+
+  function createSeenBubble(user) {
+    const bubble = document.createElement('div');
+    bubble.className = 'seen-bubble';
+
+    const profile = profilesByUserId[user.user_id] || {};
+    const avatarUrl = resolveAvatarUrl(profile, profile);
+
+    if (avatarUrl) {
+      const img = document.createElement('img');
+      img.src = avatarUrl;
+      img.alt = user.user_name || 'User';
+      bubble.appendChild(img);
+    } else {
+      const initials = document.createElement('span');
+      initials.textContent = (user.user_name || 'U').charAt(0).toUpperCase();
+      bubble.appendChild(initials);
+    }
+
+    return bubble;
+  }
+
+  function renderSeenBubbles() {
+    if (!messagesEl) return;
+    messagesEl.querySelectorAll('.seen-bubbles').forEach((el) => el.remove());
+
+    const latestRow = getLatestMyMessageRow();
+    if (!latestRow) return;
+
+    const createdAt = new Date(latestRow.dataset.createdAt || '').getTime();
+    if (!createdAt) return;
+
+    const seenUsers = Object.values(messageReadsByUserId).filter((u) => {
+      if (!u?.last_seen_at) return false;
+      if (u.user_id === session?.user?.id) return false;
+      return new Date(u.last_seen_at).getTime() >= createdAt;
+    });
+
+    if (!seenUsers.length) return;
+
+    const container = document.createElement('div');
+    container.className = 'seen-bubbles';
+
+    seenUsers.forEach((user) => {
+      container.appendChild(createSeenBubble(user));
+    });
+
+    latestRow.appendChild(container);
+  }
+
   function getReplyPreviewText(msg) {
     if (!msg || msg.deleted_at) return 'Message deleted';
 
@@ -1648,8 +1910,7 @@ function initializeApp() {
 
     replyPreviewEl.hidden = false;
     if (replyPreviewNameEl) replyPreviewNameEl.textContent = replyingTo.user;
-    if (replyPreviewTextEl)
-      replyPreviewTextEl.textContent = replyingTo.preview;
+    if (replyPreviewTextEl) replyPreviewTextEl.textContent = replyingTo.preview;
   }
 
   function setReplyTarget(msg, displayName) {
@@ -1700,59 +1961,60 @@ function initializeApp() {
   }
 
   function showInAppNotification(msg) {
-    if (!notificationArea || !msg) return;
+    if (!notificationList || !msg) return;
+    if (!notificationsEnabled) return;
 
     const channelName = itemDisplayNameForRoom(msg.room_name || ROOM_NAME);
     const sender =
-      msg.user_meta?.display_name || msg.user_name || msg.user_email || 'Unknown';
+      msg.user_meta?.display_name ||
+      msg.user_name ||
+      msg.user_email ||
+      'Unknown';
     const preview = getNotificationText(msg) || 'New message';
 
-    const card = document.createElement('div');
-    card.className = 'notification-card';
-
-    const content = document.createElement('div');
-    content.className = 'notification-content';
+    const item = document.createElement('div');
+    item.className = 'notification-item';
+    item.dataset.messageId = msg.id;
+    item.dataset.roomName = msg.room_name || ROOM_NAME;
 
     const title = document.createElement('div');
-    title.className = 'notification-title';
+    title.className = 'notification-item-title';
     title.textContent = channelName;
 
     const subtitle = document.createElement('div');
-    subtitle.className = 'notification-subtitle';
+    subtitle.className = 'notification-item-subtitle';
     subtitle.textContent = sender;
 
     const message = document.createElement('div');
-    message.className = 'notification-message';
+    message.className = 'notification-item-message';
     message.textContent = preview;
 
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'notification-close';
-    closeBtn.textContent = 'x';
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      card.remove();
-    });
+    item.appendChild(title);
+    item.appendChild(subtitle);
+    item.appendChild(message);
 
-    content.appendChild(title);
-    content.appendChild(subtitle);
-    content.appendChild(message);
-    card.appendChild(content);
-    card.appendChild(closeBtn);
-
-    card.addEventListener('click', async () => {
-      if (msg.room_name && msg.room_name !== ROOM_NAME) {
-        await switchRoom(msg.room_name);
+    item.addEventListener('click', async () => {
+      const room = item.dataset.roomName;
+      const messageId = item.dataset.messageId;
+      if (room && room !== ROOM_NAME) {
+        await switchRoom(room);
       }
-      scrollToMessage(msg.id);
-      card.remove();
+      scrollToMessage(messageId);
+      item.remove();
+      if (unreadNotifications > 0) {
+        unreadNotifications -= 1;
+        updateNotificationBadge();
+      }
     });
 
-    notificationArea.prepend(card);
+    notificationList.prepend(item);
+    unreadNotifications += 1;
+    updateNotificationBadge();
 
-    setTimeout(() => {
-      card.remove();
-    }, 8000);
+    const items = notificationList.querySelectorAll('.notification-item');
+    if (items.length > 50) {
+      items[items.length - 1].remove();
+    }
   }
 
   async function ensureNotificationPermission() {
@@ -1776,7 +2038,10 @@ function initializeApp() {
 
     const channelName = itemDisplayNameForRoom(msg.room_name || ROOM_NAME);
     const sender =
-      msg.user_meta?.display_name || msg.user_name || msg.user_email || 'Unknown';
+      msg.user_meta?.display_name ||
+      msg.user_name ||
+      msg.user_email ||
+      'Unknown';
     const preview = getNotificationText(msg) || 'New message';
 
     const title = `${channelName} • ${sender}`;
@@ -1798,8 +2063,12 @@ function initializeApp() {
     notifiedMessageIds.add(msg.id);
     setTimeout(() => notifiedMessageIds.delete(msg.id), 60000);
 
-    showInAppNotification(msg);
-    showBrowserNotification(msg);
+    if (notificationsEnabled) {
+      showInAppNotification(msg);
+      if (document.visibilityState !== 'visible') {
+        showBrowserNotification(msg);
+      }
+    }
   }
 
   // === MESSAGE RENDERING ===
@@ -1828,30 +2097,6 @@ function initializeApp() {
     row.dataset.createdAt = msg.created_at;
     if (msg.deleted_at) {
       row.classList.add('message-deleted');
-    }
-
-    // AVATAR
-    const avatar = document.createElement('div');
-    avatar.className = 'message-avatar';
-
-    const finalAvatarUrl = resolveAvatarUrl(profile, meta);
-    const safeAvatarUrl = finalAvatarUrl;
-
-    if (safeAvatarUrl) {
-      const img = document.createElement('img');
-      img.src = safeAvatarUrl;
-      img.alt = displayName;
-      img.onerror = () => {
-        avatar.innerHTML = `<div class="avatar-fallback">${displayName
-          .charAt(0)
-          .toUpperCase()}</div>`;
-      };
-      avatar.appendChild(img);
-    } else {
-      const fallback = document.createElement('div');
-      fallback.className = 'avatar-fallback';
-      fallback.textContent = displayName.charAt(0).toUpperCase();
-      avatar.appendChild(fallback);
     }
 
     // BUBBLE
@@ -1893,6 +2138,33 @@ function initializeApp() {
     const header = document.createElement('div');
     header.className = 'message-header';
 
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'message-header-left';
+
+    // AVATAR (now inside bubble header)
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+
+    const finalAvatarUrl = resolveAvatarUrl(profile, meta);
+    const safeAvatarUrl = finalAvatarUrl;
+
+    if (safeAvatarUrl) {
+      const img = document.createElement('img');
+      img.src = safeAvatarUrl;
+      img.alt = displayName;
+      img.onerror = () => {
+        avatar.innerHTML = `<div class="avatar-fallback">${displayName
+          .charAt(0)
+          .toUpperCase()}</div>`;
+      };
+      avatar.appendChild(img);
+    } else {
+      const fallback = document.createElement('div');
+      fallback.className = 'avatar-fallback';
+      fallback.textContent = displayName.charAt(0).toUpperCase();
+      avatar.appendChild(fallback);
+    }
+
     const metaEl = document.createElement('div');
     metaEl.className = 'message-meta';
 
@@ -1911,6 +2183,9 @@ function initializeApp() {
     metaEl.appendChild(usernameSpan);
     metaEl.appendChild(dotSpan);
     metaEl.appendChild(timeSpan);
+
+    headerLeft.appendChild(avatar);
+    headerLeft.appendChild(metaEl);
 
     const actions = document.createElement('div');
     actions.className = 'message-actions';
@@ -1937,7 +2212,7 @@ function initializeApp() {
       actions.appendChild(deleteBtn);
     }
 
-    header.appendChild(metaEl);
+    header.appendChild(headerLeft);
     header.appendChild(actions);
     bubble.appendChild(header);
 
@@ -2055,13 +2330,7 @@ function initializeApp() {
     reactionBar.dataset.messageId = msg.id;
     renderReactionBarForMessage(msg.id, reactionBar);
 
-    if (isMe) {
-      row.appendChild(bubble);
-      row.appendChild(avatar);
-    } else {
-      row.appendChild(avatar);
-      row.appendChild(bubble);
-    }
+    row.appendChild(bubble);
     row.appendChild(reactionBar);
 
     return row;
@@ -2069,6 +2338,40 @@ function initializeApp() {
 
   function renderMessage(msg, scroll = true, prepend = false) {
     const row = createMessageRow(msg);
+
+    const dateKey = getDateKey(msg?.created_at);
+
+    if (prepend) {
+      const firstChild = messagesEl.firstChild;
+      const firstIsSameDateDivider =
+        firstChild &&
+        firstChild.classList?.contains('date-divider') &&
+        firstChild.dataset.dateKey === dateKey;
+
+      if (!firstIsSameDateDivider) {
+        const existingDivider = messagesEl.querySelector(
+          `.date-divider[data-date-key="${dateKey}"]`,
+        );
+        if (!existingDivider) {
+          const divider = createDateDivider(msg?.created_at);
+          if (divider) {
+            messagesEl.insertBefore(divider, firstChild);
+          }
+        }
+      }
+
+      const anchor = firstIsSameDateDivider
+        ? firstChild.nextSibling
+        : firstChild;
+      messagesEl.insertBefore(row, anchor);
+    } else {
+      if (dateKey && dateKey !== lastRenderedDateKey) {
+        const divider = createDateDivider(msg?.created_at);
+        if (divider) messagesEl.appendChild(divider);
+        lastRenderedDateKey = dateKey;
+      }
+      messagesEl.appendChild(row);
+    }
 
     // Do NOT override text for deleted messages
     if (!msg.deleted_at) {
@@ -2102,13 +2405,8 @@ function initializeApp() {
       { once: true },
     );
 
-    if (prepend) {
-      messagesEl.insertBefore(row, messagesEl.firstChild);
-    } else {
-      messagesEl.appendChild(row);
-    }
-
     lastRenderedUserName = msg.user_name;
+    renderSeenBubbles();
     if (scroll) scrollToBottom();
   }
 
@@ -2129,6 +2427,7 @@ function initializeApp() {
       const rows = data || [];
       messagesEl.innerHTML = '';
       lastRenderedUserName = null;
+      lastRenderedDateKey = null;
 
       oldestMessage = rows[0] || null;
 
@@ -2178,6 +2477,8 @@ function initializeApp() {
         });
 
       scrollToBottom();
+      renderSeenBubbles();
+      markMySeen();
     } catch (err) {
       console.error('Load messages error:', err);
       showToast(
@@ -2855,13 +3156,22 @@ function initializeApp() {
   // INIT
   loadImageViewerPartial();
   loadMessages();
+  loadMessageReads();
   setupPresence();
   subscribeRealtime();
   subscribeMessageChanges();
   subscribeReactionTableChanges();
+  subscribeMessageReads();
   loadInitialReactions();
   loadThemePreference();
   reloadAllReactions();
+  markMySeen();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      markMySeen();
+    }
+  });
   const logoutBtn = document.getElementById('logoutBtn');
   const logoutOverlay = document.getElementById('logoutOverlay');
   const logoutConfirmBtn = document.getElementById('logoutConfirmBtn');
@@ -3092,12 +3402,15 @@ function initializeApp() {
     await loadMessages();
     await loadInitialReactions();
     await reloadAllReactions();
+    await loadMessageReads();
     loadImageViewerPartial();
     await setupPresence();
 
     subscribeRealtime(); // broadcast: new msg, typing, reactions
     subscribeMessageChanges(); // DB changes: insert, update, delete
     subscribeReactionTableChanges();
+    subscribeMessageReads();
+    markMySeen();
   }
   initChat();
 }
@@ -3106,6 +3419,7 @@ const appLayout = document.getElementById('appLayout');
 const sidebarBurger = document.getElementById('sidebarBurger'); // in sidebar
 const headerBurger = document.getElementById('headerBurger'); // in topbar
 const mobileBackBtn = document.getElementById('mobileBackBtn');
+const sidebarBackdrop = document.getElementById('sidebarBackdrop');
 
 // From sidebar → go to chat
 if (sidebarBurger && appLayout) {
@@ -3125,6 +3439,13 @@ if (headerBurger && appLayout) {
 if (mobileBackBtn && appLayout) {
   mobileBackBtn.addEventListener('click', () => {
     appLayout.classList.remove('chat-active');
+  });
+}
+
+// Tap on backdrop (outside sidebar) should close sidebar on mobile
+if (sidebarBackdrop && appLayout) {
+  sidebarBackdrop.addEventListener('click', () => {
+    appLayout.classList.add('chat-active');
   });
 }
 
@@ -3459,6 +3780,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.head.appendChild(style);
 });
 
+
 const refreshBtn = document.getElementById('refreshChatBtn');
 if (refreshBtn) {
   refreshBtn.addEventListener('click', () => {
@@ -3494,11 +3816,14 @@ async function refreshChat() {
     await loadMessages();
     await loadInitialReactions();
     await reloadAllReactions();
+    await loadMessageReads();
     // 5) Re-init client-side extras and realtime
     loadImageViewerPartial();
     setupPresence();
     subscribeRealtime();
     subscribeReactionTableChanges(); // <- call it
+    subscribeMessageReads();
+    markMySeen();
     // refreshChatBtn.disabled = false;
   } catch (err) {
     console.error('Failed to refresh chat', err);
