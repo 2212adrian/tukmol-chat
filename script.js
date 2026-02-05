@@ -3209,19 +3209,22 @@ function initializeApp() {
           payload = null;
         }
 
-        if (!res.ok) {
+        if (!payload || payload.ok === false || !res.ok) {
+          const errMsg =
+            payload?.data?.errors?.join?.(', ') ||
+            payload?.data?.error ||
+            payload?.raw ||
+            'Unknown error';
           showToast(
-            `Push failed (${res.status}): ${
-              payload?.error || JSON.stringify(payload) || 'Unknown error'
-            }`,
+            `Push failed (${payload?.status || res.status}): ${errMsg}`,
             'error',
           );
         } else {
           const recipients =
             payload?.data?.recipients ??
-            payload?.recipients ??
-            payload?.data?.id;
-          const info = recipients ? ` Recipients: ${recipients}` : '';
+            payload?.data?.id ??
+            payload?.recipients;
+          const info = recipients ? ` Recipients: ${recipients}` : ' (no recipients)';
           showToast(`Push queued.${info}`, 'success');
         }
       } catch (err) {

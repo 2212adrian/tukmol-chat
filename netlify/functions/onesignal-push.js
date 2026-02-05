@@ -37,7 +37,7 @@ const handler = async (event) => {
       url: url || undefined,
     };
 
-    const res = await fetch('https://api.onesignal.com/notifications', {
+    const res = await fetch('https://onesignal.com/api/v1/notifications', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
@@ -46,19 +46,23 @@ const handler = async (event) => {
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
-    if (!res.ok) {
-      return {
-        statusCode: res.status,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      };
+    const bodyText = await res.text();
+    let data = null;
+    try {
+      data = bodyText ? JSON.parse(bodyText) : null;
+    } catch {
+      data = null;
     }
 
     return {
-      statusCode: 200,
+      statusCode: res.status,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ok: true, data }),
+      body: JSON.stringify({
+        ok: res.ok,
+        status: res.status,
+        data,
+        raw: bodyText,
+      }),
     };
   } catch (err) {
     return {
