@@ -611,7 +611,7 @@ function initializeApp() {
   }
 
   let notificationsEnabled =
-    localStorage.getItem('notifications_enabled') !== 'false';
+    localStorage.getItem('notifications_enabled') === 'true';
   let unreadNotifications = 0;
 
   function updateNotificationBadge() {
@@ -646,8 +646,21 @@ function initializeApp() {
   }
 
   if (notificationToggle) {
-    notificationToggle.addEventListener('change', () => {
-      notificationsEnabled = notificationToggle.checked;
+    notificationToggle.addEventListener('change', async () => {
+      if (notificationToggle.checked) {
+        const permission = await ensureNotificationPermission();
+        if (permission !== 'granted') {
+          notificationsEnabled = false;
+          localStorage.setItem('notifications_enabled', 'false');
+          applyNotificationToggleState();
+          showToast('Notifications denied. Toggle turned off.', 'warning');
+          return;
+        }
+        notificationsEnabled = true;
+      } else {
+        notificationsEnabled = false;
+      }
+
       localStorage.setItem(
         'notifications_enabled',
         notificationsEnabled ? 'true' : 'false',
