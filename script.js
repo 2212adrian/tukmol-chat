@@ -1898,7 +1898,9 @@ function initializeApp() {
         'Read status update failed: ' + (error.message || 'Unknown error'),
         'error',
       );
+      return;
     }
+    loadMessageReads();
   }
 
   function getLatestMyMessageRow() {
@@ -3335,6 +3337,12 @@ function initializeApp() {
       markMySeen();
     }
   });
+
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      loadMessageReads();
+    }
+  }, 15000);
   const logoutBtn = document.getElementById('logoutBtn');
   const logoutOverlay = document.getElementById('logoutOverlay');
   const logoutConfirmBtn = document.getElementById('logoutConfirmBtn');
