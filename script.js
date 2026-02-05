@@ -15,7 +15,10 @@ if ('serviceWorker' in navigator) {
           const newWorker = reg.installing;
           if (!newWorker) return;
           newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            if (
+              newWorker.state === 'installed' &&
+              navigator.serviceWorker.controller
+            ) {
               newWorker.postMessage({ type: 'SKIP_WAITING' });
             }
           });
@@ -436,6 +439,7 @@ function initializeApp() {
         }
         // --------------------------------------------------------
 
+        msg._notify = true;
         const atBottom = isNearBottom();
         renderMessage(msg, atBottom, false);
         if (!atBottom) newMsgBtn.style.display = 'block';
@@ -524,14 +528,15 @@ function initializeApp() {
         (payload) => {
           console.log('[MSG CHANGE]', payload);
 
-          if (payload.eventType === 'INSERT') {
-            const msg = payload.new;
-            const atBottom = isNearBottom();
-            renderMessage(msg, atBottom, false);
-            if (!atBottom) newMsgBtn.style.display = 'block';
-            handleIncomingNotification(msg);
-            markMySeen();
-          } else if (payload.eventType === 'UPDATE') {
+        if (payload.eventType === 'INSERT') {
+          const msg = payload.new;
+          msg._notify = true;
+          const atBottom = isNearBottom();
+          renderMessage(msg, atBottom, false);
+          if (!atBottom) newMsgBtn.style.display = 'block';
+          handleIncomingNotification(msg);
+          markMySeen();
+        } else if (payload.eventType === 'UPDATE') {
             const msg = payload.new;
             if (msg.deleted_at) {
               applyDeletedMessageToUI(msg); // show "<name> just deleted this message"
@@ -2227,7 +2232,6 @@ function initializeApp() {
     setTimeout(() => notifiedMessageIds.delete(msg.id), 60000);
 
     if (notificationsEnabled) {
-      showToast('Notification: new message received.', 'info');
       showInAppNotification(msg);
       if (document.visibilityState !== 'visible') {
         showBrowserNotification(msg);
@@ -2592,6 +2596,10 @@ function initializeApp() {
     );
 
     lastRenderedUserName = msg.user_name;
+    if (msg && msg._notify) {
+      delete msg._notify;
+      handleIncomingNotification(msg);
+    }
     renderSeenBubbles();
     if (scroll) scrollToBottom();
   }
@@ -3103,10 +3111,9 @@ function initializeApp() {
 
         if (docUploadError) throw docUploadError;
 
-        const { data: docUrlData, error: docUrlError } =
-          supabaseClient.storage
-            .from('chat-files')
-            .getPublicUrl(docUploadData.path);
+        const { data: docUrlData, error: docUrlError } = supabaseClient.storage
+          .from('chat-files')
+          .getPublicUrl(docUploadData.path);
 
         if (docUrlError) throw docUrlError;
         uploadedDocUrl = docUrlData.publicUrl;
