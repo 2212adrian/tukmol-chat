@@ -612,6 +612,7 @@ function initializeApp() {
     localStorage.getItem('notifications_enabled') === 'true';
   let unreadNotifications = 0;
   let oneSignalSubId = localStorage.getItem('onesignal_sub_id') || '';
+  let cachedOneSignalIds = null;
 
   function updateNotificationBadge() {
     if (!notificationBadge) return;
@@ -2604,6 +2605,25 @@ function initializeApp() {
     }
   }
 
+  async function fetchOneSignalIds() {
+    if (!supabaseClient) return [];
+    if (Array.isArray(cachedOneSignalIds)) return cachedOneSignalIds;
+    const { data, error } = await supabaseClient
+      .from('onesignal_subscriptions')
+      .select('onesignal_id');
+    if (error) {
+      showToast(
+        'Failed to load OneSignal IDs: ' + (error.message || 'Unknown error'),
+        'error',
+      );
+      return [];
+    }
+    const ids =
+      data?.map((row) => row.onesignal_id).filter(Boolean) || [];
+    cachedOneSignalIds = ids;
+    return ids;
+  }
+
   async function syncOneSignalIdentity() {
     if (!window.OneSignalDeferred || !session?.user?.id) return;
     OneSignalDeferred.push(async function (OneSignal) {
@@ -3197,12 +3217,14 @@ function initializeApp() {
         const channelName = itemDisplayNameForRoom(ROOM_NAME);
         const sender = userDisplayName || CURRENT_USER.email || 'Someone';
         const preview = getNotificationText(data) || 'New message';
+        const oneSignalIds = await fetchOneSignalIds();
         const res = await fetch('/.netlify/functions/onesignal-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: `${channelName} • ${sender}`,
             message: preview,
+            include_player_ids: oneSignalIds.length ? oneSignalIds : undefined,
           }),
         });
         let payload = null;
