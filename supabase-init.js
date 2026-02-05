@@ -7,7 +7,7 @@ const PUBLIC_BASE = `${SUPABASE_URL}/storage/v1/object/public/${AVATAR_BUCKET}`;
 
 window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
-    storage: window.sessionStorage,
+    storage: window.localStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
