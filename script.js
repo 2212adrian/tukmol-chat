@@ -3160,23 +3160,26 @@ function initializeApp() {
             message: preview,
           }),
         });
-        const resText = await res.text();
+        let payload = null;
+        try {
+          payload = await res.json();
+        } catch {
+          payload = null;
+        }
+
         if (!res.ok) {
           showToast(
-            `Push failed (${res.status}): ${resText || 'Unknown error'}`,
+            `Push failed (${res.status}): ${
+              payload?.error || JSON.stringify(payload) || 'Unknown error'
+            }`,
             'error',
           );
         } else {
-          let info = '';
-          try {
-            const parsed = JSON.parse(resText);
-            const recipients = parsed?.data?.recipients ?? parsed?.recipients;
-            if (Number.isFinite(recipients)) {
-              info = ` Recipients: ${recipients}`;
-            }
-          } catch {
-            // ignore parse errors
-          }
+          const recipients =
+            payload?.data?.recipients ??
+            payload?.recipients ??
+            payload?.data?.id;
+          const info = recipients ? ` Recipients: ${recipients}` : '';
           showToast(`Push queued.${info}`, 'success');
         }
       } catch (err) {
