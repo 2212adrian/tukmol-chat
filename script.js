@@ -1820,6 +1820,10 @@ function initializeApp() {
 
     if (error) {
       console.error('Load message reads error', error);
+      showToast(
+        'Read status error: ' + (error.message || 'Unknown error'),
+        'error',
+      );
       return;
     }
 
@@ -1888,7 +1892,13 @@ function initializeApp() {
       .from('message_reads')
       .upsert(payload, { onConflict: 'room_name,user_id' });
 
-    if (error) console.error('Update message read error', error);
+    if (error) {
+      console.error('Update message read error', error);
+      showToast(
+        'Read status update failed: ' + (error.message || 'Unknown error'),
+        'error',
+      );
+    }
   }
 
   function getLatestMyMessageRow() {
