@@ -3152,7 +3152,7 @@ function initializeApp() {
         const channelName = itemDisplayNameForRoom(ROOM_NAME);
         const sender = userDisplayName || CURRENT_USER.email || 'Someone';
         const preview = getNotificationText(data) || 'New message';
-        await fetch('/.netlify/functions/onesignal-push', {
+        const res = await fetch('/.netlify/functions/onesignal-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3160,8 +3160,20 @@ function initializeApp() {
             message: preview,
           }),
         });
+        const resText = await res.text();
+        if (!res.ok) {
+          showToast(
+            `Push failed (${res.status}): ${resText || 'Unknown error'}`,
+            'error',
+          );
+        } else {
+          showToast('Push queued.', 'success');
+        }
       } catch (err) {
-        console.error('Push send failed', err);
+        showToast(
+          'Push send failed: ' + (err.message || 'Unknown error'),
+          'error',
+        );
       }
 
       await chatChannel.send({
