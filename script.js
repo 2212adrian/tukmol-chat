@@ -2202,6 +2202,7 @@ function initializeApp() {
     setTimeout(() => notifiedMessageIds.delete(msg.id), 60000);
 
     if (notificationsEnabled) {
+      showToast('Notification: new message received.', 'info');
       showInAppNotification(msg);
       if (document.visibilityState !== 'visible') {
         showBrowserNotification(msg);
