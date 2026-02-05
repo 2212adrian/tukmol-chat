@@ -3356,6 +3356,18 @@ function initializeApp() {
       loadMessageReads();
     }
   }, 15000);
+
+  let lastSeenMessageId = null;
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    const rows = messagesEl?.querySelectorAll('.message-row') || [];
+    const latestRow = rows.length ? rows[rows.length - 1] : null;
+    const latestId = latestRow?.dataset?.messageId || null;
+    if (latestId && latestId !== lastSeenMessageId) {
+      lastSeenMessageId = latestId;
+      markMySeen();
+    }
+  }, 1000);
   const logoutBtn = document.getElementById('logoutBtn');
   const logoutOverlay = document.getElementById('logoutOverlay');
   const logoutConfirmBtn = document.getElementById('logoutConfirmBtn');
