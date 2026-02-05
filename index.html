@@ -37,6 +37,21 @@
     <script src="supabase-init.js"></script>
     <script src="emojis.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+    </script>
+    <script
+      src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
+      defer
+    ></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function (OneSignal) {
+        await OneSignal.init({
+          appId: 'aa1acec4-ba76-45ae-a916-6ce0318074aa',
+        });
+      });
+    </script>
   </head>
 
   <body>
