@@ -218,6 +218,7 @@ function initializeApp() {
   let lastRenderedUserName = null;
   let lastRenderedDateKey = null;
   let attachedImages = [];
+  let attachedFiles = [];
   let messageReadsByUserId = {};
   let readChangesChannel = null;
 
@@ -491,14 +492,14 @@ function initializeApp() {
         (payload) => {
           console.log('[MSG CHANGE]', payload);
 
-        if (payload.eventType === 'INSERT') {
-          const msg = payload.new;
-          const atBottom = isNearBottom();
-          renderMessage(msg, atBottom, false);
-          if (!atBottom) newMsgBtn.style.display = 'block';
-          handleIncomingNotification(msg);
-          markMySeen();
-        } else if (payload.eventType === 'UPDATE') {
+          if (payload.eventType === 'INSERT') {
+            const msg = payload.new;
+            const atBottom = isNearBottom();
+            renderMessage(msg, atBottom, false);
+            if (!atBottom) newMsgBtn.style.display = 'block';
+            handleIncomingNotification(msg);
+            markMySeen();
+          } else if (payload.eventType === 'UPDATE') {
             const msg = payload.new;
             if (msg.deleted_at) {
               applyDeletedMessageToUI(msg); // show "<name> just deleted this message"
@@ -784,10 +785,11 @@ function initializeApp() {
 
     const hasText = messageInput.value.trim().length > 0;
     const hasImages = attachedImages.length > 0;
+    const hasFiles = attachedFiles.length > 0;
 
     // 1) show / hide send button depending on text / images
     if (textFieldContainer) {
-      if (hasText || hasImages) {
+      if (hasText || hasImages || hasFiles) {
         textFieldContainer.classList.add('chat-has-text');
         showSendBtn();
       } else {
@@ -882,8 +884,8 @@ function initializeApp() {
       const files = e.dataTransfer?.files;
       if (!files || !files.length) return;
 
-      addImageFiles(files);
-      showToast('Image added from drag & drop.', 'info');
+      addAttachmentFiles(files);
+      showToast('File added from drag & drop.', 'info');
     });
   }
 
@@ -933,7 +935,41 @@ function initializeApp() {
       filePreview.appendChild(chip);
     });
 
-    if (!attachedImages.length) {
+    attachedFiles.forEach((item, index) => {
+      const chip = document.createElement('div');
+      chip.className = 'preview-chip preview-file';
+
+      const icon = document.createElement('div');
+      icon.className = 'preview-file-icon';
+      icon.textContent = 'DOC';
+      chip.appendChild(icon);
+
+      const meta = document.createElement('div');
+      meta.className = 'preview-file-meta';
+      const name = document.createElement('div');
+      name.className = 'preview-file-name';
+      name.textContent = item.file.name;
+      const size = document.createElement('div');
+      size.className = 'preview-file-size';
+      size.textContent = formatFileSize(item.file.size);
+      meta.appendChild(name);
+      meta.appendChild(size);
+      chip.appendChild(meta);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'preview-remove';
+      removeBtn.textContent = 'X';
+      removeBtn.onclick = () => {
+        attachedFiles.splice(index, 1);
+        renderImagePreview();
+      };
+      chip.appendChild(removeBtn);
+
+      filePreview.appendChild(chip);
+    });
+
+    if (!attachedImages.length && !attachedFiles.length) {
       filePreview.textContent = '';
     }
   }
@@ -957,6 +993,31 @@ function initializeApp() {
 
     renderImagePreview();
     updateSendButtonState();
+    sendBtn.disabled = false;
+  }
+
+  function addAttachmentFiles(files) {
+    if (!files || !files.length) return;
+
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        addImageFiles([file]);
+      } else {
+        if (attachedFiles.length >= 1) {
+          showToast('You can attach 1 document at a time.', 'warning');
+          break;
+        }
+        attachedFiles.push({ file });
+        showToast(
+          `Document attached: ${file.name} (${formatFileSize(file.size)})`,
+          'info',
+        );
+      }
+    }
+
+    renderImagePreview();
+    updateSendButtonState();
+    sendBtn.disabled = false;
   }
 
   function scrollToBottom() {
@@ -1705,6 +1766,18 @@ function initializeApp() {
     return `${y}-${m}-${day}`;
   }
 
+  function formatFileSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex += 1;
+    }
+    return `${size.toFixed(size < 10 && unitIndex > 0 ? 1 : 0)} ${units[unitIndex]}`;
+  }
+
   function formatDateLabel(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr);
@@ -1759,11 +1832,10 @@ function initializeApp() {
       (id) => !profilesByUserId[id],
     );
     if (ids.length) {
-      const { data: profilesData, error: profilesError } =
-        await supabaseClient
-          .from('profiles')
-          .select('id, avatar_url, display_name, email')
-          .in('id', ids);
+      const { data: profilesData, error: profilesError } = await supabaseClient
+        .from('profiles')
+        .select('id, avatar_url, display_name, email')
+        .in('id', ids);
       if (!profilesError && profilesData) {
         profilesData.forEach((p) => {
           profilesByUserId[p.id] = p;
@@ -1871,9 +1943,20 @@ function initializeApp() {
     const container = document.createElement('div');
     container.className = 'seen-bubbles';
 
+    const text = document.createElement('div');
+    text.className = 'seen-text';
+    const names = seenUsers
+      .map((u) => u.user_name || profilesByUserId[u.user_id]?.display_name)
+      .filter(Boolean);
+    text.textContent = `Seen by ${names.join(', ')}`;
+    container.appendChild(text);
+
+    const icons = document.createElement('div');
+    icons.className = 'seen-icons';
     seenUsers.forEach((user) => {
-      container.appendChild(createSeenBubble(user));
+      icons.appendChild(createSeenBubble(user));
     });
+    container.appendChild(icons);
 
     latestRow.appendChild(container);
   }
@@ -1887,6 +1970,9 @@ function initializeApp() {
     const hasImages =
       (Array.isArray(msg.image_urls) && msg.image_urls.length) || msg.image_url;
     if (hasImages) return '[image]';
+    if (msg.file_name) return msg.file_name;
+
+    if (msg.file_name) return msg.file_name;
 
     return raw || '';
   }
@@ -1957,6 +2043,7 @@ function initializeApp() {
     const hasImages =
       (Array.isArray(msg.image_urls) && msg.image_urls.length) || msg.image_url;
     if (hasImages) return '[image]';
+    if (msg.file_name) return msg.file_name;
     return raw || '';
   }
 
@@ -2294,6 +2381,28 @@ function initializeApp() {
     const allUrls = [...urlsFromColumns];
     if (gifUrlFromText) {
       allUrls.push(gifUrlFromText);
+    }
+
+    if (!msg.deleted_at && msg.file_url) {
+      const fileCard = document.createElement('a');
+      fileCard.className = 'message-file';
+      fileCard.href = msg.file_url;
+      fileCard.target = '_blank';
+      fileCard.rel = 'noreferrer';
+
+      const fileName = document.createElement('div');
+      fileName.className = 'message-file-name';
+      fileName.textContent = msg.file_name || 'Document';
+
+      const fileSize = document.createElement('div');
+      fileSize.className = 'message-file-size';
+      fileSize.textContent = msg.file_size
+        ? formatFileSize(Number(msg.file_size))
+        : '';
+
+      fileCard.appendChild(fileName);
+      fileCard.appendChild(fileSize);
+      bubble.appendChild(fileCard);
     }
 
     if (!msg.deleted_at && allUrls.length) {
@@ -2803,7 +2912,12 @@ function initializeApp() {
 
     const rawText = messageInput.value.trim();
     const filesToUpload = attachedImages.map((i) => i.file);
-    if (!rawText && !filesToUpload.length) return;
+    const docToUpload = attachedFiles[0]?.file || null;
+    if (!rawText && !filesToUpload.length && !docToUpload) return;
+    if (docToUpload && docToUpload.size > 20 * 1024 * 1024) {
+      showToast('Document is too large (max 20MB).', 'warning');
+      return;
+    }
 
     const CURRENT_USER = session.user;
     const userDisplayName = getDisplayNameFromUser(CURRENT_USER);
@@ -2865,7 +2979,7 @@ function initializeApp() {
     }
 
     // CREATE MODE
-    if (!rawText && !filesToUpload.length) return;
+    if (!rawText && !filesToUpload.length && !docToUpload) return;
 
     sendBtn.disabled = true;
 
@@ -2901,9 +3015,34 @@ function initializeApp() {
         logInfo('[Chat] Image URL: ' + urlData.publicUrl);
       }
 
+      let uploadedDocUrl = null;
+      if (docToUpload) {
+        showToast(`Uploading ${docToUpload.name}...`, 'info');
+        const docFileName = `${Date.now()}-${docToUpload.name}`;
+        const { data: docUploadData, error: docUploadError } =
+          await supabaseClient.storage
+            .from('chat-files')
+            .upload(docFileName, docToUpload, { upsert: true });
+
+        if (docUploadError) throw docUploadError;
+
+        const { data: docUrlData, error: docUrlError } =
+          supabaseClient.storage
+            .from('chat-files')
+            .getPublicUrl(docUploadData.path);
+
+        if (docUrlError) throw docUrlError;
+        uploadedDocUrl = docUrlData.publicUrl;
+      }
+
       const processedText = convertShortcodesToEmoji(rawText);
       const hasText = processedText.trim().length > 0;
       const hasImages = uploadedUrls.length > 0;
+      const hasFile = Boolean(uploadedDocUrl);
+      if (docToUpload && !hasFile && !hasText && !hasImages) {
+        showToast('Failed to upload document.', 'error');
+        return;
+      }
 
       const replyPayload = replyingTo
         ? {
@@ -2925,10 +3064,20 @@ function initializeApp() {
           chat_text_color: chatTextColor,
           chat_texture: chatTexture,
         },
-        content: hasText ? processedText : hasImages ? '[image]' : '',
-        type: hasImages ? 'image' : 'text',
+        content: hasText
+          ? processedText
+          : hasImages
+            ? '[image]'
+            : hasFile
+              ? '[file]'
+              : '',
+        type: hasImages ? 'image' : hasFile ? 'file' : 'text',
         image_url: uploadedUrls[0] || null,
         image_urls: hasImages ? uploadedUrls : null,
+        file_url: uploadedDocUrl,
+        file_name: docToUpload ? docToUpload.name : null,
+        file_size: docToUpload ? docToUpload.size : null,
+        file_type: docToUpload ? docToUpload.type : null,
         ...replyPayload,
       };
 
@@ -2963,6 +3112,7 @@ function initializeApp() {
 
       attachedImages.forEach((i) => URL.revokeObjectURL(i.url));
       attachedImages = [];
+      attachedFiles = [];
       renderImagePreview();
       updateSendButtonState();
       sendBtn.disabled = false;
@@ -3044,7 +3194,7 @@ function initializeApp() {
       imageInput.value = '';
       return;
     }
-    addImageFiles(files);
+    addAttachmentFiles(files);
     imageInput.value = '';
   });
 
@@ -3069,9 +3219,11 @@ function initializeApp() {
   function updateSendButtonState() {
     const hasText = messageInput.value.trim().length > 0;
     const hasImages = attachedImages.length > 0;
+    const hasFiles = attachedFiles.length > 0;
+    const shouldEnable = hasText || hasImages || hasFiles;
 
     if (textFieldContainer) {
-      if (hasText || hasImages) {
+      if (shouldEnable) {
         textFieldContainer.classList.add('chat-has-text');
         showSendBtn();
       } else {
@@ -3079,6 +3231,7 @@ function initializeApp() {
         hideSendBtn();
       }
     }
+    sendBtn.disabled = !shouldEnable;
   }
 
   sendBtn.addEventListener('transitionend', (e) => {
@@ -3779,7 +3932,6 @@ document.addEventListener('DOMContentLoaded', () => {
   style.textContent = css;
   document.head.appendChild(style);
 });
-
 
 const refreshBtn = document.getElementById('refreshChatBtn');
 if (refreshBtn) {
