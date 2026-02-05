@@ -2213,6 +2213,14 @@ function initializeApp() {
     const preview = getNotificationText(msg) || 'New message';
 
     const title = `${channelName} • ${sender}`;
+    console.log('[Notify] Browser notification', {
+      title,
+      preview,
+      channel: channelName,
+      sender,
+      permission,
+      visible: document.visibilityState,
+    });
     try {
       new Notification(title, {
         body: preview,
