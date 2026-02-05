@@ -645,6 +645,22 @@ function initializeApp() {
     }
   }
 
+  async function syncNotificationPermission() {
+    if (!notificationToggle) return;
+    if (!notificationToggle.checked) return;
+    const permission = await ensureNotificationPermission();
+    if (permission !== 'granted') {
+      notificationsEnabled = false;
+      localStorage.setItem('notifications_enabled', 'false');
+      applyNotificationToggleState();
+      showToast('Notifications denied. Toggle turned off.', 'warning');
+      return;
+    }
+    notificationsEnabled = true;
+    localStorage.setItem('notifications_enabled', 'true');
+    applyNotificationToggleState();
+  }
+
   if (notificationToggle) {
     notificationToggle.addEventListener('change', async () => {
       if (notificationToggle.checked) {
@@ -688,6 +704,7 @@ function initializeApp() {
 
   applyNotificationToggleState();
   updateNotificationBadge();
+  syncNotificationPermission();
   // hydrate sidebar/header avatar from auth metadata
   const userAvatarUrl = getAvatarUrlFromUser(CURRENT_USER);
   const userInitial = CURRENT_USERNAME.charAt(0).toUpperCase();
