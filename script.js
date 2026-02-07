@@ -158,8 +158,9 @@ function initializeApp() {
   // === EVENTS (CRITICAL FIX 2: Correct, Single Listener) ===
   function handleSendClick() {
     hideEmojiSuggestions();
-    if (voiceJustStopped) {
+    if (voiceJustStopped || voiceJustStarted) {
       voiceJustStopped = false;
+      voiceJustStarted = false;
       return;
     }
     if (voiceRecordState === 'recording') {
@@ -179,30 +180,26 @@ function initializeApp() {
     // Attach the single, correct listener
     sendBtn.addEventListener('click', handleSendClick);
 
-    sendBtn.addEventListener('pointerdown', (e) => {
+    sendBtn.addEventListener('pointerdown', () => {
       if (!canStartVoiceRecording()) return;
       if (voiceRecordState !== 'idle') return;
       if (voiceHoldTimerId) clearTimeout(voiceHoldTimerId);
       voiceHoldTimerId = setTimeout(() => {
         voiceHoldTimerId = null;
         startVoiceRecording();
-      }, 250);
-      e.preventDefault();
+      }, 200);
     });
 
-    const stopIfRecording = () => {
+    const releaseHold = () => {
       if (voiceHoldTimerId) {
         clearTimeout(voiceHoldTimerId);
         voiceHoldTimerId = null;
       }
-      if (voiceRecordState === 'recording') {
-        stopVoiceRecording();
-      }
     };
 
-    sendBtn.addEventListener('pointerup', stopIfRecording);
-    sendBtn.addEventListener('pointerleave', stopIfRecording);
-    sendBtn.addEventListener('pointercancel', stopIfRecording);
+    sendBtn.addEventListener('pointerup', releaseHold);
+    sendBtn.addEventListener('pointerleave', releaseHold);
+    sendBtn.addEventListener('pointercancel', releaseHold);
   }
   // ========================================================
 
@@ -539,9 +536,13 @@ function initializeApp() {
               const atBottom = isNearBottom();
               renderMessage(msg, atBottom, false);
               if (!atBottom) newMsgBtn.style.display = 'block';
+              handleIncomingNotification(msg);
+              updateChannelTimeForRoom(msg.room_name, msg.created_at);
               markMySeen();
             } else {
               handleIncomingNotification(msg);
+              incrementChannelUnread(msg.room_name);
+              updateChannelTimeForRoom(msg.room_name, msg.created_at);
             }
           } else if (payload.eventType === 'UPDATE') {
             const msg = payload.new;
@@ -584,7 +585,7 @@ function initializeApp() {
           const profile = payload.new;
           if (!profile?.id) return;
           profilesByUserId[profile.id] = profile;
-          applyProfileTextColorToMessages(profile.id, profile);
+          applyProfileAppearanceToMessages(profile.id, profile);
         },
       )
       .subscribe();
@@ -647,6 +648,9 @@ function initializeApp() {
   const messagesEl = document.querySelector('.messages-container');
   const messageInput = document.getElementById('messageInput');
   const imageInput = document.getElementById('imageInput');
+  const inputWrapper = document.querySelector('.input-wrapper');
+  const isCoarsePointer =
+    window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
   sendBtn.style.display = 'none';
   const filePreview = document.getElementById('filePreview');
@@ -660,6 +664,16 @@ function initializeApp() {
   const voiceRecordLabel = document.getElementById('voiceRecordLabel');
   const voiceRecordTimer = document.getElementById('voiceRecordTimer');
   const voiceRecordCancelBtn = document.getElementById('voiceRecordCancelBtn');
+  const voiceRecordSpectrum = document.getElementById('voiceRecordSpectrum');
+  const recordingOverlay = document.getElementById('recordingOverlay');
+  if (voiceRecordBar) {
+    voiceRecordBar.hidden = true;
+    voiceRecordBar.style.display = 'none';
+  }
+  if (recordingOverlay) {
+    recordingOverlay.hidden = true;
+    recordingOverlay.style.display = 'none';
+  }
   const emojiSuggestionsEl = document.getElementById('emojiSuggestions');
   const replyPreviewEl = document.getElementById('replyPreview');
   const replyPreviewNameEl = document.getElementById('replyPreviewName');
@@ -674,6 +688,9 @@ function initializeApp() {
   const textFieldContainer = document.querySelector('.text-field-container');
   const sidebarUsername = document.getElementById('sidebarUsername');
   const onlineUsersContainer = document.getElementById('onlineUsersContainer');
+  const allUsersOverlay = document.getElementById('allUsersOverlay');
+  const allUsersList = document.getElementById('allUsersList');
+  const allUsersCloseBtn = document.getElementById('allUsersCloseBtn');
   if (sidebarUsername) sidebarUsername.textContent = CURRENT_USERNAME;
 
   if (cancelReplyBtn) {
@@ -695,9 +712,14 @@ function initializeApp() {
   let voiceRecordTimerId = null;
   let voiceRecordTimeoutId = null;
   let voiceRecordStartAt = 0;
+  let voiceRecordDurationMs = 0;
   let voiceRecordDiscard = false;
   let voiceJustStopped = false;
+  let voiceJustStarted = false;
   let voiceHoldTimerId = null;
+  let voiceAudioCtx = null;
+  let voiceAnalyser = null;
+  let voiceSpectrumRaf = null;
 
   function updateNotificationBadge() {
     if (!notificationBadge) return;
@@ -767,14 +789,32 @@ function initializeApp() {
     if (!voiceRecordBar) return;
     if (voiceRecordState === 'recording') {
       voiceRecordBar.hidden = false;
+      voiceRecordBar.style.display = 'flex';
       if (voiceRecordLabel) voiceRecordLabel.textContent = 'Recording...';
+      if (recordingOverlay) {
+        recordingOverlay.hidden = false;
+        recordingOverlay.style.display = 'flex';
+      }
+      if (inputWrapper) inputWrapper.classList.add('recording-active');
       setSendButtonMode('recording');
     } else if (voiceRecordState === 'ready') {
       voiceRecordBar.hidden = false;
+      voiceRecordBar.style.display = 'flex';
       if (voiceRecordLabel) voiceRecordLabel.textContent = 'Ready to send';
+      if (recordingOverlay) {
+        recordingOverlay.hidden = true;
+        recordingOverlay.style.display = 'none';
+      }
+      if (inputWrapper) inputWrapper.classList.add('recording-active');
       setSendButtonMode('send');
     } else {
       voiceRecordBar.hidden = true;
+      voiceRecordBar.style.display = 'none';
+      if (recordingOverlay) {
+        recordingOverlay.hidden = true;
+        recordingOverlay.style.display = 'none';
+      }
+      if (inputWrapper) inputWrapper.classList.remove('recording-active');
       setSendButtonMode(canStartVoiceRecording() ? 'mic' : 'send');
     }
   }
@@ -790,11 +830,73 @@ function initializeApp() {
     }
   }
 
+  function stopVoiceSpectrum() {
+    if (voiceSpectrumRaf) {
+      cancelAnimationFrame(voiceSpectrumRaf);
+      voiceSpectrumRaf = null;
+    }
+    if (voiceAudioCtx) {
+      voiceAudioCtx.close().catch(() => {});
+      voiceAudioCtx = null;
+    }
+    voiceAnalyser = null;
+    if (voiceRecordSpectrum) {
+      const ctx = voiceRecordSpectrum.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(
+          0,
+          0,
+          voiceRecordSpectrum.width,
+          voiceRecordSpectrum.height,
+        );
+      }
+    }
+  }
+
+  function startVoiceSpectrum(stream) {
+    if (!voiceRecordSpectrum || !stream) return;
+    stopVoiceSpectrum();
+
+    try {
+      voiceAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = voiceAudioCtx.createMediaStreamSource(stream);
+      voiceAnalyser = voiceAudioCtx.createAnalyser();
+      voiceAnalyser.fftSize = 64;
+      source.connect(voiceAnalyser);
+
+      const canvas = voiceRecordSpectrum;
+      const ctx = canvas.getContext('2d');
+      const bufferLength = voiceAnalyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const draw = () => {
+        if (!voiceAnalyser || !ctx) return;
+        voiceAnalyser.getByteFrequencyData(dataArray);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const barWidth = canvas.width / bufferLength;
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] / 255;
+          const barHeight = Math.max(2, v * canvas.height);
+          const x = i * barWidth;
+          ctx.fillStyle = 'rgba(248, 250, 252, 0.8)';
+          ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+        }
+        voiceSpectrumRaf = requestAnimationFrame(draw);
+      };
+
+      draw();
+    } catch {
+      // ignore spectrum failures
+    }
+  }
+
   function stopVoiceStream() {
     if (voiceRecordStream) {
       voiceRecordStream.getTracks().forEach((t) => t.stop());
       voiceRecordStream = null;
     }
+    stopVoiceSpectrum();
   }
 
   function startVoiceTimer() {
@@ -802,6 +904,7 @@ function initializeApp() {
     voiceRecordTimer.textContent = '00:00';
     voiceRecordTimerId = setInterval(() => {
       const elapsed = Date.now() - voiceRecordStartAt;
+      voiceRecordDurationMs = elapsed;
       voiceRecordTimer.textContent = formatVoiceTime(elapsed);
     }, 200);
   }
@@ -817,10 +920,9 @@ function initializeApp() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       voiceRecordStream = stream;
+      startVoiceSpectrum(stream);
 
-      const mimeType = MediaRecorder.isTypeSupported(
-        'audio/webm;codecs=opus',
-      )
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')
           ? 'audio/webm'
@@ -830,7 +932,13 @@ function initializeApp() {
       voiceRecordBlob = null;
       voiceRecordDiscard = false;
       voiceRecordStartAt = Date.now();
+      voiceRecordDurationMs = 0;
       voiceRecordState = 'recording';
+      voiceJustStopped = false;
+      voiceJustStarted = true;
+      setTimeout(() => {
+        voiceJustStarted = false;
+      }, 300);
       updateVoiceRecordUI();
       startVoiceTimer();
 
@@ -864,19 +972,23 @@ function initializeApp() {
       voiceRecordTimeoutId = setTimeout(() => {
         stopVoiceRecording(true);
       }, 30000);
+
+      if (navigator.vibrate) {
+        navigator.vibrate(20);
+      }
     } catch (err) {
       voiceRecordState = 'idle';
       updateVoiceRecordUI();
-      showToast(
-        'Microphone access denied or unavailable.',
-        'warning',
-      );
+      showToast('Microphone access denied or unavailable.', 'warning');
     }
   }
 
   function stopVoiceRecording(fromTimeout = false) {
     if (voiceRecordState !== 'recording' || !voiceRecorder) return;
     voiceJustStopped = true;
+    if (navigator.vibrate) {
+      navigator.vibrate(10);
+    }
     clearVoiceTimers();
     if (fromTimeout) {
       showToast('Recording stopped at 30 seconds.', 'info');
@@ -886,6 +998,7 @@ function initializeApp() {
 
   function cancelVoiceRecording() {
     voiceRecordDiscard = true;
+    voiceRecordDurationMs = 0;
     if (voiceRecordState === 'recording' && voiceRecorder) {
       voiceRecorder.stop();
     } else {
@@ -1055,6 +1168,56 @@ function initializeApp() {
 
   const roomNameHeader = document.getElementById('roomNameHeader');
   const channelItems = document.querySelectorAll('.channel-item');
+  const channelUnreadCounts = {};
+
+  function ensureChannelBadge(roomName) {
+    const item = document.querySelector(
+      `.channel-item[data-room-name="${roomName}"]`,
+    );
+    if (!item) return null;
+    const avatar = item.querySelector('.avatar-box');
+    if (!avatar) return null;
+    let badge = avatar.querySelector('.channel-unread-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'channel-unread-badge';
+      badge.hidden = true;
+      avatar.appendChild(badge);
+    }
+    return badge;
+  }
+
+  function incrementChannelUnread(roomName) {
+    if (!roomName || roomName === ROOM_NAME) return;
+    channelUnreadCounts[roomName] = (channelUnreadCounts[roomName] || 0) + 1;
+    const badge = ensureChannelBadge(roomName);
+    if (badge) {
+      const count = channelUnreadCounts[roomName] || 0;
+      badge.textContent = count ? String(count) : '';
+      badge.hidden = count === 0;
+    }
+  }
+
+  function clearChannelUnread(roomName) {
+    channelUnreadCounts[roomName] = 0;
+    const badge = ensureChannelBadge(roomName);
+    if (badge) {
+      badge.textContent = '';
+      badge.hidden = true;
+    }
+  }
+
+  function refreshChannelBadges() {
+    channelItems.forEach((item) => {
+      const room = item.getAttribute('data-room-name');
+      if (!room) return;
+      const count = channelUnreadCounts[room] || 0;
+      const badge = ensureChannelBadge(room);
+      if (!badge) return;
+      badge.textContent = count ? String(count) : '';
+      badge.hidden = count === 0;
+    });
+  }
 
   channelItems.forEach((item) => {
     item.addEventListener('click', () => {
@@ -1063,11 +1226,18 @@ function initializeApp() {
     });
   });
 
+  channelItems.forEach((item) => {
+    const room = item.getAttribute('data-room-name');
+    if (room) ensureChannelBadge(room);
+  });
+  refreshChannelBadges();
+
   async function switchRoom(newRoom) {
     if (!newRoom || newRoom === ROOM_NAME) return;
     if (!supabaseClient) return;
 
     ROOM_NAME = newRoom;
+    clearChannelUnread(newRoom);
     clearReplyTarget();
     messageReadsByUserId = {};
 
@@ -1138,6 +1308,55 @@ function initializeApp() {
       `.channel-item[data-room-name="${room}"]`,
     );
     return item?.getAttribute('data-room-display') || room.replace(/-/g, ' ');
+  }
+
+  function formatRelativeTime(isoString) {
+    if (!isoString) return '';
+    const now = Date.now();
+    const ts = new Date(isoString).getTime();
+    if (Number.isNaN(ts)) return '';
+    const diff = Math.max(0, now - ts);
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'Now';
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d`;
+    const d = new Date(ts);
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  function updateChannelTimeForRoom(roomName, createdAt) {
+    const item = document.querySelector(
+      `.channel-item[data-room-name="${roomName}"]`,
+    );
+    if (!item) return;
+    const timeEl = item.querySelector('.time');
+    if (!timeEl) return;
+    const ts = new Date(createdAt || 0).getTime();
+    const prev = Number(item.dataset.lastMessageTs || 0);
+    if (ts && ts < prev) return;
+    item.dataset.lastMessageTs = String(ts || prev || 0);
+    timeEl.textContent = createdAt ? formatRelativeTime(createdAt) : timeEl.textContent;
+  }
+
+  async function refreshChannelTimes() {
+    if (!supabaseClient) return;
+    const { data, error } = await supabaseClient
+      .from('messages')
+      .select('room_name, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) return;
+
+    const seen = new Set();
+    (data || []).forEach((row) => {
+      if (!row?.room_name || !row?.created_at) return;
+      if (seen.has(row.room_name)) return;
+      seen.add(row.room_name);
+      updateChannelTimeForRoom(row.room_name, row.created_at);
+    });
   }
 
   if (textFieldContainer) textFieldContainer.classList.remove('chat-has-text');
@@ -1535,6 +1754,49 @@ function initializeApp() {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
+  function renderMessageContent(rawText) {
+    if (!rawText) return '';
+    const lines = String(rawText).split('\n');
+    const parts = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      if (line.startsWith('>>>')) {
+        const blockLines = [line.slice(3).trimStart(), ...lines.slice(i + 1)];
+        const blockHtml = blockLines
+          .map((l) => {
+            const safe = escapeHtml(l);
+            return `<div class="quote-line">${marked.parseInline(safe)}</div>`;
+          })
+          .join('');
+        parts.push(`<div class="quote-block">${blockHtml}</div>`);
+        break;
+      }
+
+      if (line.startsWith('>')) {
+        const safe = escapeHtml(line.slice(1).trimStart());
+        parts.push(`<div class="quote-line">${marked.parseInline(safe)}</div>`);
+        i += 1;
+        continue;
+      }
+
+      if (line.startsWith('-# ')) {
+        const safe = escapeHtml(line.slice(3));
+        parts.push(`<div class="small-line">${marked.parseInline(safe)}</div>`);
+        i += 1;
+        continue;
+      }
+
+      const safe = escapeHtml(line);
+      parts.push(`<div class="text-line">${marked.parseInline(safe)}</div>`);
+      i += 1;
+    }
+
+    return parts.join('');
+  }
+
   // === ANTI-SPAM ===
   let sendTimestamps = [];
   let isSendBlocked = false;
@@ -1743,6 +2005,10 @@ function initializeApp() {
       existing.remove();
       return;
     }
+
+    document
+      .querySelectorAll('.reaction-picker-popup')
+      .forEach((p) => p.remove());
 
     const popup = document.createElement('div');
     popup.className = 'reaction-picker-popup';
@@ -2006,6 +2272,71 @@ function initializeApp() {
         { once: true },
       );
     });
+
+    const allItem = document.createElement('div');
+    allItem.className = 'story-item story-item-all';
+    const allAvatar = document.createElement('div');
+    allAvatar.className = 'story-avatar';
+    allAvatar.textContent = '+';
+    const allName = document.createElement('div');
+    allName.className = 'story-name';
+    allName.textContent = 'See all users';
+    allItem.appendChild(allAvatar);
+    allItem.appendChild(allName);
+    allItem.addEventListener('click', openAllUsersOverlay);
+    onlineUsersContainer.appendChild(allItem);
+  }
+
+  function closeAllUsersOverlay() {
+    if (!allUsersOverlay) return;
+    allUsersOverlay.hidden = true;
+  }
+
+  async function openAllUsersOverlay() {
+    if (!allUsersOverlay || !allUsersList || !supabaseClient) return;
+    allUsersOverlay.hidden = false;
+    allUsersList.innerHTML = '<div class="all-users-row">Loading...</div>';
+
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('id, email, display_name, avatar_url')
+      .order('display_name', { ascending: true });
+
+    if (error) {
+      allUsersList.innerHTML =
+        '<div class="all-users-row">Failed to load users.</div>';
+      return;
+    }
+
+    allUsersList.innerHTML = '';
+    (data || []).forEach((user) => {
+      const row = document.createElement('div');
+      row.className = 'all-users-row';
+
+      const avatar = document.createElement('div');
+      avatar.className = 'all-users-avatar';
+      const displayName = user.display_name || user.email || 'Unknown';
+      if (user.avatar_url) {
+        const img = document.createElement('img');
+        img.src = user.avatar_url;
+        img.alt = displayName;
+        img.onerror = () => {
+          avatar.textContent = displayName.charAt(0).toUpperCase();
+        };
+        avatar.appendChild(img);
+      } else {
+        avatar.textContent = displayName.charAt(0).toUpperCase();
+      }
+
+      const name = document.createElement('div');
+      name.className = 'all-users-name';
+      const email = user.email || '';
+      name.textContent = email ? `${displayName} · ${email}` : displayName;
+
+      row.appendChild(avatar);
+      row.appendChild(name);
+      allUsersList.appendChild(row);
+    });
   }
 
   function syncOnlineUsersFromPresenceState(presenceState) {
@@ -2084,9 +2415,7 @@ function initializeApp() {
   function cssColorToHex(color) {
     if (!color) return null;
     if (color.startsWith('#')) return color;
-    const match = color.match(
-      /rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i,
-    );
+    const match = color.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
     if (!match) return null;
     const r = Number(match[1]);
     const g = Number(match[2]);
@@ -2115,7 +2444,7 @@ function initializeApp() {
     return { isMe, profile, meta, bgColor, textColor };
   }
 
-  function applyProfileTextColorToMessages(userId, profile) {
+  function applyProfileAppearanceToMessages(userId, profile) {
     if (!messagesEl || !userId) return;
     const rows = messagesEl.querySelectorAll(
       `.message-row[data-user-id="${userId}"]`,
@@ -2125,19 +2454,52 @@ function initializeApp() {
     rows.forEach((row) => {
       const bubble = row.querySelector('.message-bubble');
       if (!bubble) return;
+      const style = profile?.bubble_style || 'solid';
+      const textureUrl = profile?.chat_texture || null;
+      const bgColor =
+        profile?.chat_bg_color ||
+        (row.classList.contains('me') ? '#2563eb' : '#1f2937');
+      const textColor =
+        profile?.chat_text_color || getReadableTextColor(bgColor);
 
-      let textColor = profile?.chat_text_color || null;
-      if (!textColor) {
-        const bg = getComputedStyle(bubble).backgroundColor;
-        const hex = cssColorToHex(bg);
-        textColor = hex ? getReadableTextColor(hex) : null;
+      bubble.style.backgroundImage = '';
+      bubble.style.backgroundRepeat = '';
+      bubble.style.backgroundSize = '';
+      bubble.style.backgroundBlendMode = '';
+      bubble.classList.remove('texture', 'glass', 'outline');
+      bubble.style.background = '';
+      bubble.style.border = '';
+      bubble.style.backdropFilter = '';
+      bubble.style.webkitBackdropFilter = '';
+
+      bubble.style.backgroundColor = bgColor;
+      if (style === 'texture' && textureUrl) {
+        bubble.style.backgroundImage = `url('${textureUrl}')`;
+        bubble.style.backgroundRepeat = 'repeat';
+        bubble.style.backgroundSize = '72px 72px';
+        bubble.style.backgroundBlendMode = 'overlay';
+        bubble.classList.add('texture');
+      } else if (style === 'glass') {
+        bubble.style.background = `linear-gradient(
+        135deg,
+        ${bgColor}66,
+        rgba(255,255,255,0.1)
+      )`;
+        bubble.style.backdropFilter = 'blur(10px)';
+        bubble.style.webkitBackdropFilter = 'blur(10px)';
+        bubble.style.border = '1px solid rgba(255,255,255,0.1)';
+        bubble.classList.add('glass');
+      } else if (style === 'outline') {
+        const fill = bgColor + '1A';
+        bubble.style.background = fill;
+        bubble.style.backgroundColor = fill;
+        bubble.style.border = `1px solid ${bgColor}`;
+        bubble.classList.add('outline');
       }
 
-      if (textColor) {
-        bubble.style.color = textColor;
-        const textEl = row.querySelector('.message-text');
-        if (textEl) textEl.style.color = textColor;
-      }
+      bubble.style.color = textColor;
+      const textEl = row.querySelector('.message-text');
+      if (textEl) textEl.style.color = textColor;
     });
   }
 
@@ -2467,6 +2829,48 @@ function initializeApp() {
     return raw || '';
   }
 
+  function getShareTextFromMessage(msg) {
+    if (!msg) return '';
+    if (msg.content && msg.content !== '[image]' && msg.content !== '[audio]') {
+      return msg.content;
+    }
+    if (msg.file_url) return msg.file_url;
+    const urls =
+      Array.isArray(msg.image_urls) && msg.image_urls.length
+        ? msg.image_urls
+        : msg.image_url
+          ? [msg.image_url]
+          : [];
+    if (urls.length) return urls.join('\n');
+    if (msg.content) return msg.content;
+    return '';
+  }
+
+  async function copyMessageContent(msg) {
+    const text = getShareTextFromMessage(msg);
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Message copied.', 'success');
+    } catch {
+      showToast('Failed to copy message.', 'error');
+    }
+  }
+
+  async function shareMessageContent(msg) {
+    const text = getShareTextFromMessage(msg);
+    if (!text) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch {
+        // ignore
+      }
+    }
+    await copyMessageContent(msg);
+  }
+
   function showInAppNotification(msg) {
     if (!notificationList || !msg) return;
     if (!notificationsEnabled) return;
@@ -2643,7 +3047,7 @@ function initializeApp() {
     if (style === 'texture' && textureUrl) {
       bubble.style.backgroundImage = `url('${textureUrl}')`;
       bubble.style.backgroundRepeat = 'repeat';
-      bubble.style.backgroundSize = '120px 120px';
+      bubble.style.backgroundSize = '50px 50px';
       bubble.style.backgroundBlendMode = 'overlay';
       bubble.classList.add('texture');
     } else if (style === 'glass') {
@@ -2719,23 +3123,42 @@ function initializeApp() {
 
     const actions = document.createElement('div');
     actions.className = 'message-actions';
+    actions.hidden = true;
+
     if (!msg.deleted_at) {
       const replyBtn = document.createElement('button');
       replyBtn.className = 'message-action-btn reply-btn';
-      replyBtn.textContent = 'Reply';
+      replyBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 9V5l-7 7 7 7v-4h7a4 4 0 0 0 4-4V9h-2v2a2 2 0 0 1-2 2h-7z"/></svg> Reply';
       replyBtn.onclick = () => setReplyTarget(msg, displayName);
       actions.appendChild(replyBtn);
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'message-action-btn copy-btn';
+      copyBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H10V7h9v14z"/></svg> Copy';
+      copyBtn.onclick = () => copyMessageContent(msg);
+      actions.appendChild(copyBtn);
+
+      const shareBtn = document.createElement('button');
+      shareBtn.className = 'message-action-btn share-btn';
+      shareBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16a3 3 0 0 0-2.4 1.2L8.9 13a3.2 3.2 0 0 0 0-2l6.6-4.1A3 3 0 1 0 14 5a3 3 0 0 0 .1.8l-6.6 4.1a3 3 0 1 0 0 4.2l6.6 4.1A3 3 0 1 0 18 16z"/></svg> Share';
+      shareBtn.onclick = () => shareMessageContent(msg);
+      actions.appendChild(shareBtn);
     }
 
     if (isMe && !msg.deleted_at) {
       const editBtn = document.createElement('button');
       editBtn.className = 'message-action-btn edit-btn';
-      editBtn.textContent = '✏';
+      editBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zm18-10.5a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75L21 6.75z"/></svg> Edit';
       editBtn.onclick = () => editMessage(msg);
 
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'message-action-btn delete-btn';
-      deleteBtn.textContent = '🗑';
+      deleteBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z"/></svg> Delete';
       deleteBtn.onclick = () => deleteMessage(msg);
 
       actions.appendChild(editBtn);
@@ -2791,8 +3214,7 @@ function initializeApp() {
       gifUrlFromText = extractSingleGifUrl(msg.content);
 
       if (!gifUrlFromText) {
-        const safe = escapeHtml(msg.content);
-        const html = marked.parse(safe);
+        const html = renderMessageContent(msg.content);
 
         const tmp = document.createElement('div');
         tmp.innerHTML = html;
@@ -2838,6 +3260,19 @@ function initializeApp() {
         audio.src = msg.file_url;
         audio.preload = 'metadata';
         bubble.appendChild(audio);
+
+        const meta = document.createElement('div');
+        meta.className = 'message-audio-meta';
+        meta.textContent = 'Voice message';
+        bubble.appendChild(meta);
+
+        audio.addEventListener('loadedmetadata', () => {
+          if (!Number.isFinite(audio.duration)) return;
+          const seconds = Math.round(audio.duration);
+          const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+          const s = String(seconds % 60).padStart(2, '0');
+          meta.textContent = `Voice message â€¢ ${m}:${s}`;
+        });
       } else {
         const fileCard = document.createElement('a');
         fileCard.className = 'message-file';
@@ -2898,6 +3333,196 @@ function initializeApp() {
     row.appendChild(bubble);
     row.appendChild(reactionBar);
 
+    // Mobile gestures: long-press for react, swipe left to edit, swipe right to delete, double-tap to edit (own)
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchMoved = false;
+    let longPressTimer = null;
+    let longPressTriggered = false;
+    let lastTapAt = 0;
+    let isSwiping = false;
+    let suppressClick = false;
+    const swipeThreshold = 80;
+
+    const createSwipeIndicator = (type) => {
+      const el = document.createElement('div');
+      el.className = `swipe-indicator swipe-indicator-${type}`;
+      const icon =
+        type === 'left'
+          ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 9V5l-7 7 7 7v-4h7a4 4 0 0 0 4-4V9h-2v2a2 2 0 0 1-2 2h-7z" /></svg>'
+          : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z" /></svg>';
+      el.innerHTML = `<span class="swipe-indicator-icon">${icon}</span>`;
+      return el;
+    };
+
+    const swipeLeftIndicator = createSwipeIndicator('left');
+    bubble.appendChild(swipeLeftIndicator);
+    const swipeRightIndicator = createSwipeIndicator('right');
+    bubble.appendChild(swipeRightIndicator);
+
+    const clearLongPress = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+
+    bubble.addEventListener('touchstart', (e) => {
+      if (msg.deleted_at) return;
+      if (msg.deleted_at) return;
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchMoved = false;
+      longPressTriggered = false;
+      isSwiping = false;
+      bubble.style.transition = '';
+      swipeLeftIndicator.style.opacity = '0';
+      swipeRightIndicator.style.opacity = '0';
+
+      clearLongPress();
+      longPressTimer = setTimeout(() => {
+        longPressTriggered = true;
+        if (navigator.vibrate) {
+          navigator.vibrate(12);
+        }
+        openReactionPicker(msg.id, reactionBar);
+      }, 500);
+    });
+
+    bubble.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        touchMoved = true;
+        clearLongPress();
+      }
+      const canSwipeLeft = dx < 0 && Math.abs(dy) < 40;
+      const canSwipeRight = isMe && dx > 0 && Math.abs(dy) < 40;
+      if (canSwipeLeft || canSwipeRight) {
+        isSwiping = true;
+        const clamped = Math.max(Math.min(dx, swipeThreshold), -swipeThreshold);
+        bubble.style.transform = `translateX(${clamped}px)`;
+
+        const progress = Math.min(Math.abs(clamped) / swipeThreshold, 1);
+        if (clamped < 0) {
+          swipeLeftIndicator.style.opacity = String(progress);
+          if (swipeRightIndicator) swipeRightIndicator.style.opacity = '0';
+          bubble.style.setProperty('--swipe-bg', 'rgba(59, 130, 246, 0.6)');
+          bubble.style.setProperty('--swipe-opacity', String(progress * 0.9));
+        } else {
+          if (swipeRightIndicator)
+            swipeRightIndicator.style.opacity = String(progress);
+          swipeLeftIndicator.style.opacity = '0';
+          bubble.style.setProperty('--swipe-bg', 'rgba(239, 68, 68, 0.7)');
+          bubble.style.setProperty('--swipe-opacity', String(progress));
+        }
+      }
+    });
+
+    bubble.addEventListener('touchend', (e) => {
+      clearLongPress();
+      if (longPressTriggered) return;
+
+      const touch = e.changedTouches[0];
+      const endX = touch?.clientX ?? touchStartX;
+      const endY = touch?.clientY ?? touchStartY;
+      const dx = endX - touchStartX;
+      const dy = endY - touchStartY;
+
+      if (!touchMoved && Math.abs(dy) > 60 && Math.abs(dx) < 40) {
+        if (dy > 0) {
+          copyMessageContent(msg);
+        } else {
+          shareMessageContent(msg);
+        }
+        bubble.style.transition = 'transform 160ms ease';
+        bubble.style.transform = 'translateX(0px)';
+        swipeLeftIndicator.style.opacity = '0';
+        swipeRightIndicator.style.opacity = '0';
+        bubble.style.setProperty('--swipe-opacity', '0');
+        return;
+      }
+
+      // Swipe left to reply
+      if (isSwiping && dx < -60 && Math.abs(dy) < 40) {
+        setReplyTarget(msg, displayName);
+        bubble.style.transition = 'transform 160ms ease';
+        bubble.style.transform = 'translateX(0px)';
+        swipeLeftIndicator.style.opacity = '0';
+        bubble.style.setProperty('--swipe-opacity', '0');
+        return;
+      }
+
+      // Swipe right to delete (own only)
+      if (isSwiping && dx > 60 && Math.abs(dy) < 40) {
+        if (isMe) {
+          deleteMessage(msg);
+        }
+        bubble.style.transition = 'transform 160ms ease';
+        bubble.style.transform = 'translateX(0px)';
+        swipeRightIndicator.style.opacity = '0';
+        bubble.style.setProperty('--swipe-opacity', '0');
+        return;
+      }
+
+      // Double tap to edit own message
+      if (!touchMoved && isMe && !msg.deleted_at) {
+        const now = Date.now();
+        if (now - lastTapAt < 300) {
+          editMessage(msg);
+          lastTapAt = 0;
+          bubble.classList.remove('message-doubletap');
+          void bubble.offsetWidth;
+          bubble.classList.add('message-doubletap');
+          const ripple = document.createElement('span');
+          ripple.className = 'edit-ripple';
+          bubble.appendChild(ripple);
+          ripple.addEventListener(
+            'animationend',
+            () => {
+              ripple.remove();
+            },
+            { once: true },
+          );
+          return;
+        }
+        lastTapAt = now;
+      }
+
+      if (!touchMoved && !msg.deleted_at && (!isMe || lastTapAt === 0)) {
+        const isHidden = actions.hidden;
+        document
+          .querySelectorAll('.message-actions')
+          .forEach((el) => (el.hidden = true));
+        actions.hidden = !isHidden;
+        suppressClick = true;
+        setTimeout(() => {
+          suppressClick = false;
+        }, 250);
+      }
+
+      if (isSwiping) {
+        bubble.style.transition = 'transform 160ms ease';
+        bubble.style.transform = 'translateX(0px)';
+        swipeLeftIndicator.style.opacity = '0';
+        swipeRightIndicator.style.opacity = '0';
+        bubble.style.setProperty('--swipe-opacity', '0');
+      }
+    });
+
+    bubble.addEventListener('click', (e) => {
+      if (e.detail > 1) return;
+      if (msg.deleted_at) return;
+      if (suppressClick) return;
+      const isHidden = actions.hidden;
+      document
+        .querySelectorAll('.message-actions')
+        .forEach((el) => (el.hidden = true));
+      actions.hidden = !isHidden;
+    });
+
     return row;
   }
 
@@ -2936,29 +3561,6 @@ function initializeApp() {
         lastRenderedDateKey = dateKey;
       }
       messagesEl.appendChild(row);
-    }
-
-    // Do NOT override text for deleted messages
-    if (!msg.deleted_at) {
-      const textEl = row.querySelector('.message-text');
-      if (textEl && typeof msg.content === 'string') {
-        const safe = msg.content
-          .split('\n')
-          .map((line) =>
-            line.replace(/[&<>"']/g, (ch) => {
-              const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-              };
-              return map[ch];
-            }),
-          )
-          .join('<br>');
-        textEl.innerHTML = safe;
-      }
     }
 
     row.classList.add('message-enter');
@@ -3095,8 +3697,10 @@ function initializeApp() {
           }
           MESSAGE_CONTENT_CACHE[msg.id] = msg.content;
           renderMessage(msg, false);
+          updateChannelTimeForRoom(msg.room_name, msg.created_at);
         });
 
+      clearChannelUnread(ROOM_NAME);
       scrollToBottom();
       renderSeenBubbles();
       markMySeen();
@@ -3151,6 +3755,7 @@ function initializeApp() {
           if (!profilesError && profilesData) {
             for (const p of profilesData) {
               profilesByUserId[p.id] = p;
+              applyProfileAppearanceToMessages(p.id, p);
             }
 
             rows.forEach((msg) => {
@@ -3250,6 +3855,7 @@ function initializeApp() {
       inputLabelEl.hidden = false;
       inputLabelEl.textContent = 'Editing';
     }
+    if (cancelEditBtn) cancelEditBtn.classList.add('show');
   }
 
   function cancelEdit() {
@@ -3271,10 +3877,13 @@ function initializeApp() {
     const row = messagesEl.querySelector(`[data-message-id="${msg.id}"]`);
     if (!row) return;
 
+    row.querySelectorAll('.edit-badge').forEach((b) => b.remove());
+
     const content = row.querySelector('.message-text');
     if (content) {
       const name = msg.deleted_by_name || msg.user_name || 'Someone';
-      content.textContent = `${name} just deleted this message`;
+      const safeName = escapeHtml(name);
+      content.innerHTML = `<span class="deleted-message"><span class="deleted-message-name">${safeName}</span> just deleted this message</span>`;
     }
 
     // REMOVE any images/GIFs visually
@@ -3284,6 +3893,10 @@ function initializeApp() {
     }
 
     row.classList.add('message-deleted');
+    const bubble = row.querySelector('.message-bubble');
+    if (bubble) {
+      bubble.classList.add('message-deleted-bubble');
+    }
 
     row.classList.add('message-leave');
     row.addEventListener(
@@ -3300,6 +3913,12 @@ function initializeApp() {
       showToast('You can only DELETE messages within 5 minutes', 'warning');
       return;
     }
+    if (voiceRecordState !== 'idle') {
+      cancelVoiceRecording();
+      updateSendButtonState();
+    }
+    if (editingMessage) cancelEdit();
+    if (replyingTo) clearReplyTarget();
 
     const result = await Swal.fire({
       title: 'Delete message?',
@@ -3377,8 +3996,7 @@ function initializeApp() {
 
     const textEl = row.querySelector('.message-text');
     if (textEl) {
-      const safe = escapeHtml(msg.content);
-      const html = marked.parse(safe);
+      const html = renderMessageContent(msg.content);
 
       // Re-apply message-rendering logic to preserve custom theme colors/styles
       const { textColor } = resolveMessageColors(msg);
@@ -3566,8 +4184,7 @@ function initializeApp() {
     } catch (err) {
       logError('Voice send error', err);
       showToast(
-        'Failed to send voice message: ' +
-          (err.message || 'Unknown error'),
+        'Failed to send voice message: ' + (err.message || 'Unknown error'),
         'error',
       );
     } finally {
@@ -3584,7 +4201,11 @@ function initializeApp() {
     if (!supabaseClient) return;
     if (!canSendNow()) return;
 
-    const rawText = messageInput.value.trim();
+    const rawValue = applyPendingEmojiSuggestion(messageInput.value);
+    if (rawValue !== messageInput.value) {
+      messageInput.value = rawValue;
+    }
+    const rawText = rawValue.trim();
     const filesToUpload = attachedImages.map((i) => i.file);
     const docToUpload = attachedFiles[0]?.file || null;
 
@@ -3784,7 +4405,10 @@ function initializeApp() {
           );
         }
       } catch (err) {
-        showToast(`Push error: ${err.message}`, 'error');
+        showToast(
+          `Push OneSignal service is unavaiable, try again later.`,
+          'error',
+        );
       }
 
       await chatChannel.send({
@@ -3817,6 +4441,7 @@ function initializeApp() {
     if (!emojiSuggestionsEl) return;
     emojiSuggestionsEl.innerHTML = '';
     emojiSuggestionsEl.style.display = 'none';
+    selectedEmojiIndex = -1;
   }
 
   function showEmojiSuggestions(filterText, colonIndex) {
@@ -3829,11 +4454,17 @@ function initializeApp() {
     }
 
     emojiSuggestionsEl.innerHTML = '';
-    matches.forEach((item) => {
+    selectedEmojiIndex = 0;
+    matches.forEach((item, idx) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'emoji-suggestion-item';
       btn.textContent = `${item.emoji}  ${item.code}`;
+      btn.dataset.emoji = item.emoji;
+      btn.dataset.code = item.code;
+      if (idx === selectedEmojiIndex) {
+        btn.classList.add('selected');
+      }
       btn.onclick = () => {
         const value = messageInput.value;
         const cursorPos = messageInput.selectionStart || 0;
@@ -3851,22 +4482,51 @@ function initializeApp() {
     emojiSuggestionsEl.style.display = 'block';
   }
 
+  function applyPendingEmojiSuggestion(text) {
+    if (!emojiSuggestionsEl) return text;
+    if (emojiSuggestionsEl.style.display !== 'block') return text;
+    const items = emojiSuggestionsEl.querySelectorAll('.emoji-suggestion-item');
+    if (!items.length) return text;
+
+    const cursorPos = messageInput.selectionStart || text.length;
+    const beforeCursor = text.slice(0, cursorPos);
+    const colonIndex = beforeCursor.lastIndexOf(':');
+    if (colonIndex === -1) return text;
+    const query = beforeCursor.slice(colonIndex + 1);
+    if (!query || query.includes(' ') || query.includes('\n')) return text;
+
+    const idx =
+      typeof selectedEmojiIndex === 'number' && selectedEmojiIndex >= 0
+        ? selectedEmojiIndex
+        : 0;
+    const item = items[idx] || items[0];
+    const emoji = item?.dataset?.emoji;
+    if (!emoji) return text;
+
+    const next =
+      text.slice(0, colonIndex) + emoji + text.slice(cursorPos);
+    return next;
+  }
+
   messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      hideEmojiSuggestions();
-      if (voiceRecordState === 'recording') {
-        stopVoiceRecording();
-        return;
-      }
-      if (voiceRecordState === 'ready') {
-        if (!messageInput.value.trim()) {
-          sendVoiceMessage();
+      const allowSend = !isCoarsePointer || e.ctrlKey || e.metaKey;
+      if (allowSend) {
+        e.preventDefault();
+        hideEmojiSuggestions();
+        if (voiceRecordState === 'recording') {
+          stopVoiceRecording();
           return;
         }
-        cancelVoiceRecording();
+        if (voiceRecordState === 'ready') {
+          if (!messageInput.value.trim()) {
+            sendVoiceMessage();
+            return;
+          }
+          cancelVoiceRecording();
+        }
+        sendMessage();
       }
-      sendMessage();
     }
     if (e.key === 'Escape' && editingMessage) {
       e.preventDefault();
@@ -3889,6 +4549,15 @@ function initializeApp() {
         hideEmojiSuggestions();
         showToast('Edit cancelled.', 'info');
       }
+    });
+  }
+
+  if (allUsersCloseBtn) {
+    allUsersCloseBtn.addEventListener('click', closeAllUsersOverlay);
+  }
+  if (allUsersOverlay) {
+    allUsersOverlay.addEventListener('click', (e) => {
+      if (e.target === allUsersOverlay) closeAllUsersOverlay();
     });
   }
 
@@ -3932,8 +4601,7 @@ function initializeApp() {
       voiceRecordState === 'recording' ||
       voiceRecordState === 'ready' ||
       canRecord;
-    const shouldShow =
-      shouldEnable || voiceRecordState !== 'idle' || canRecord;
+    const shouldShow = shouldEnable || voiceRecordState !== 'idle' || canRecord;
 
     if (textFieldContainer) {
       if (shouldShow) {
@@ -3974,8 +4642,8 @@ function initializeApp() {
     const picker = new EmojiButton({
       position: 'top-end',
       autoHide: true,
-      emojisPerRow: 8,
-      rows: 4,
+      emojisPerRow: 6,
+      rows: 5,
       rootElement: document.body,
     });
 
@@ -4001,6 +4669,32 @@ function initializeApp() {
     if (!emojiSuggestionsEl) return;
     if (!emojiSuggestionsEl.contains(e.target) && e.target !== messageInput) {
       hideEmojiSuggestions();
+    }
+  });
+
+  // Close popups / actions on outside click
+  document.addEventListener('click', (e) => {
+    const target = e.target;
+    if (target && target.closest('.message-bubble')) return;
+
+    const picker = document.querySelector('.reaction-picker-popup');
+    if (picker && !picker.contains(target)) {
+      picker.remove();
+    }
+
+    const details = document.querySelector('.reaction-details-popup');
+    if (details && !details.contains(target)) {
+      details.remove();
+    }
+
+    const actions = document.querySelectorAll('.message-actions');
+    if (actions.length) {
+      const clickedInActions = Array.from(actions).some((a) =>
+        a.contains(target),
+      );
+      if (!clickedInActions) {
+        actions.forEach((a) => (a.hidden = true));
+      }
     }
   });
 
@@ -4043,6 +4737,7 @@ function initializeApp() {
   subscribeReactionTableChanges(ROOM_NAME);
   subscribeMessageReads();
   loadInitialReactions();
+  refreshChannelTimes();
   loadThemePreference();
   reloadAllReactions();
   markMySeen();
@@ -4390,11 +5085,11 @@ document.addEventListener('DOMContentLoaded', () => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
   font-weight: 600;
-  opacity: 0.9;
+  letter-spacing: 0.02em;
   }
   .reaction-details-close {
     border: none;
@@ -4405,8 +5100,8 @@ document.addEventListener('DOMContentLoaded', () => {
     align-items: center;
     justify-content: center;
     font-size: 11px;
-    background: rgba(15, 23, 42, 0.85);
-    color: #9ca3af;
+    background: rgba(148, 163, 184, 0.18);
+    color: #cbd5f5;
     cursor: pointer;
     transition:
       background 120ms ease,
@@ -4416,16 +5111,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   .reaction-details-close:hover {
-    background: rgba(31, 41, 55, 0.95);
-    color: #facc15;
+    background: rgba(248, 250, 252, 0.18);
+    color: #f8fafc;
     transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.65);
+    box-shadow: 0 6px 14px rgba(2, 6, 23, 0.35);
   }
 
   .reaction-details-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
 
   .reaction-details-row {
@@ -4433,6 +5128,9 @@ document.addEventListener('DOMContentLoaded', () => {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: rgba(148, 163, 184, 0.08);
   }
 
   .reaction-remove-btn {
@@ -4445,8 +5143,8 @@ document.addEventListener('DOMContentLoaded', () => {
     border-radius: 50%;
     cursor: pointer;
     font-size: 12px;
-    background: rgba(255, 255, 255, 0.12);
-    color: #ff6b6b;
+    background: rgba(239, 68, 68, 0.18);
+    color: #f87171;
   }
 
   .edit-badge {
@@ -4681,7 +5379,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const refreshBtn = document.getElementById('refreshChatBtn');
 if (refreshBtn) {
   refreshBtn.addEventListener('click', () => {
-    refreshChat();
+    window.location.reload();
   });
 }
 
@@ -4718,7 +5416,7 @@ async function refreshChat() {
     loadImageViewerPartial();
     setupPresence();
     subscribeRealtime();
-    subscribeReactionTableChanges(ROOM_NAME); // <- call it
+    subscribeReactionTableChanges(ROOM_NAME);
     subscribeMessageReads();
     markMySeen();
     // refreshChatBtn.disabled = false;

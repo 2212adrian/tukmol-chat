@@ -135,7 +135,7 @@
           <button id="settingsBtn" class="sidebar-pill settings-btn">
             <i class="fa-solid fa-gear"></i><span>Settings</span>
           </button>
-          <div class="sidebar-version">v1.6.0</div>
+          <div class="sidebar-version">v1.6.3</div>
           <button id="logoutBtn" class="sidebar-pill logout-btn">
             <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
           </button>
@@ -221,6 +221,7 @@
         </div>
         <!-- Input Section -->
         <div class="input-section">
+          <div id="recordingOverlay" class="recording-overlay" hidden></div>
           <div class="drag-overlay" id="dragOverlay">
             <div class="drag-overlay-inner">
               <div class="drag-icon">⬆️</div>
@@ -265,6 +266,28 @@
               <button id="emojiBtn" class="emoji-btn">😊</button>
             </div>
 
+            <div id="voiceRecordBar" class="voice-record-bar" hidden>
+              <div class="voice-record-status">
+                <span class="voice-record-dot"></span>
+                <span id="voiceRecordLabel">Recording...</span>
+              </div>
+              <canvas
+                id="voiceRecordSpectrum"
+                class="voice-record-spectrum"
+                width="120"
+                height="24"
+              ></canvas>
+              <div id="voiceRecordTimer" class="voice-record-timer">00:00</div>
+              <button
+                id="voiceRecordCancelBtn"
+                class="voice-record-cancel"
+                type="button"
+                title="Cancel recording"
+              >
+                X
+              </button>
+            </div>
+
             <button id="sendBtn" class="send-btn">
               <svg
                 width="20"
@@ -287,6 +310,17 @@
 
     <!-- Modals -->
     <div id="imageViewerContainer"></div>
+    <div id="allUsersOverlay" class="all-users-overlay" hidden>
+      <div class="all-users-modal">
+        <div class="all-users-header">
+          <h3>All Users</h3>
+          <button id="allUsersCloseBtn" class="all-users-close" type="button">
+            ✕
+          </button>
+        </div>
+        <div id="allUsersList" class="all-users-list"></div>
+      </div>
+    </div>
     <div id="logoutOverlay" class="logout-overlay">
       <div class="logout-modal">
         <div class="logout-icon">⚠</div>
