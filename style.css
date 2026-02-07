@@ -1106,7 +1106,9 @@ body.dark-mode .chat-header {
   background: var(--swipe-bg, transparent);
   opacity: var(--swipe-opacity, 0);
   z-index: -1;
-  transition: opacity 120ms ease, background 120ms ease;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease;
   filter: blur(2px);
 }
 
@@ -1116,24 +1118,24 @@ body.dark-mode .chat-header {
   gap: 6px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.18);
-  color: inherit;
+  background: rgba(148, 163, 184, 0.2);
+  color: rgba(226, 232, 240, 0.9);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 .message-row.other .deleted-message {
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(59, 130, 246, 0.15);
 }
 
 .deleted-message-name {
-  color: inherit;
-  font-weight: 700;
+  color: #facc15;
 }
 
 .message-deleted-bubble {
   border: 1px dashed rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.35) !important;
   box-shadow: none;
 }
 
@@ -1725,7 +1727,6 @@ body.dark-mode .message-actions {
   fill: currentColor;
 }
 
-
 .delete-btn:hover {
   color: #ff5f6d;
 }
@@ -2192,9 +2193,37 @@ body.dark-mode .reaction-picker-popup {
   padding: 5px 15px;
   border-radius: 24px;
   background: var(--bg-input);
+  position: relative;
   transition:
     background 0.25s ease,
     width 0.16s ease;
+}
+
+.message-char-count {
+  position: absolute;
+  right: 19px;
+  bottom: -12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: rgba(226, 232, 240, 0.95);
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow:
+    0 6px 16px rgba(2, 6, 23, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(6px);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.message-char-count.over-limit {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.75);
+  border-color: rgba(248, 113, 113, 0.6);
 }
 
 .text-field-container.chat-has-text {
@@ -3353,7 +3382,6 @@ body.dark-mode .reaction-picker-popup {
   position: relative;
   z-index: 4;
 }
-
 
 .voice-record-status {
   display: flex;

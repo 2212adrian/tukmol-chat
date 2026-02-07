@@ -664,6 +664,7 @@ function initializeApp() {
   const notificationList = document.getElementById('notificationList');
   const markAllReadBtn = document.getElementById('markAllReadBtn');
   const textFieldContainer = document.querySelector('.text-field-container');
+  const messageCharCount = document.getElementById('messageCharCount');
   const sidebarUsername = document.getElementById('sidebarUsername');
   const MAX_SIDEBAR_NAME_LEN = 15;
   const formatSidebarUsername = (value) => {
@@ -1345,8 +1346,29 @@ function initializeApp() {
   }
 
   if (textFieldContainer) textFieldContainer.classList.remove('chat-has-text');
+  const MAX_MESSAGE_CHARS = 1000;
+
+  function updateMessageCharCount() {
+    if (!messageCharCount || !messageInput) return;
+    const count = messageInput.value.length;
+    if (count <= 0) {
+      messageCharCount.hidden = true;
+      messageCharCount.textContent = '0';
+      messageCharCount.classList.remove('over-limit');
+      return;
+    }
+    messageCharCount.hidden = false;
+    messageCharCount.textContent = String(count);
+    if (count > MAX_MESSAGE_CHARS) {
+      messageCharCount.classList.add('over-limit');
+    } else {
+      messageCharCount.classList.remove('over-limit');
+    }
+  }
+
   function handleMessageInputChange() {
     updateSendButtonState();
+    updateMessageCharCount();
 
     const hasText = messageInput.value.trim().length > 0;
     const hasImages = attachedImages.length > 0;
@@ -2526,6 +2548,22 @@ function initializeApp() {
     });
   }
 
+  function refreshAllBubbleThemes() {
+    if (!messagesEl) return;
+    const rows = messagesEl.querySelectorAll('.message-row');
+    rows.forEach((row) => {
+      const bubble = row.querySelector('.message-bubble');
+      if (!bubble) return;
+      const textEl = row.querySelector('.message-text');
+      const userId = row.dataset.userId;
+      if (!userId) return;
+      applyBubbleTheme(bubble, textEl, {
+        user_id: userId,
+        user_meta: {},
+      });
+    });
+  }
+
   function extractSingleGifUrl(text) {
     if (!text) return null;
     const trimmed = text.trim();
@@ -3037,9 +3075,6 @@ function initializeApp() {
       LAST_AVATAR_BY_USER_ID[msg.user_id] = resolvedFromMessage;
     }
 
-    const style = profile.bubble_style || meta.bubble_style || 'solid';
-    const textureUrl = resolveTextureUrl(profile, meta);
-
     const displayName =
       profile.display_name ||
       meta.display_name ||
@@ -3061,37 +3096,7 @@ function initializeApp() {
     // BUBBLE
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble';
-
-    const baseColor = bgColor;
-
-    bubble.style.backgroundColor = baseColor;
-    if (textColor) {
-      bubble.style.color = textColor;
-    }
-
-    if (style === 'texture' && textureUrl) {
-      bubble.style.backgroundImage = `url('${textureUrl}')`;
-      bubble.style.backgroundRepeat = 'repeat';
-      bubble.style.backgroundSize = '50px 50px';
-      bubble.style.backgroundBlendMode = 'overlay';
-      bubble.classList.add('texture');
-    } else if (style === 'glass') {
-      bubble.style.background = `linear-gradient(
-      135deg,
-      ${baseColor}66,
-      rgba(255,255,255,0.1)
-    )`;
-      bubble.style.backdropFilter = 'blur(10px)';
-      bubble.style.webkitBackdropFilter = 'blur(10px)';
-      bubble.style.border = '1px solid rgba(255,255,255,0.1)';
-      bubble.classList.add('glass');
-    } else if (style === 'outline') {
-      const fill = baseColor + '1A';
-      bubble.style.background = fill;
-      bubble.style.backgroundColor = fill;
-      bubble.style.border = `1px solid ${baseColor}`;
-      bubble.classList.add('outline');
-    }
+    applyBubbleTheme(bubble, null, msg);
 
     // HEADER
     const header = document.createElement('div');
@@ -3871,6 +3876,9 @@ function initializeApp() {
       room_name: msg.room_name,
     };
     messageInput.value = contentToEdit || '';
+    messageInput.style.height = 'auto';
+    messageInput.style.height = messageInput.scrollHeight + 'px';
+    handleMessageInputChange();
 
     // ... rest of the function ...
     messageInput.focus();
@@ -3889,6 +3897,7 @@ function initializeApp() {
     editingMessage = null;
     messageInput.value = '';
     messageInput.style.height = 'auto';
+    handleMessageInputChange();
     const inputSection = document.querySelector('.input-section');
     if (inputSection) inputSection.classList.remove('editing');
 
@@ -4217,6 +4226,14 @@ function initializeApp() {
   async function sendMessage() {
     if (!supabaseClient) return;
     if (!canSendNow()) return;
+
+    if (messageInput.value.length > MAX_MESSAGE_CHARS) {
+      showToast(
+        `Message is too long (max ${MAX_MESSAGE_CHARS} characters).`,
+        'warning',
+      );
+      return;
+    }
 
     const rawValue = applyPendingEmojiSuggestion(messageInput.value);
     if (rawValue !== messageInput.value) {
@@ -4595,18 +4612,26 @@ function initializeApp() {
   };
 
   function updateSendButtonState() {
+    const textLength = messageInput.value.length;
     const hasText = messageInput.value.trim().length > 0;
+    const overLimit = textLength > MAX_MESSAGE_CHARS;
     const hasImages = attachedImages.length > 0;
     const hasFiles = attachedFiles.length > 0;
     const canRecord = canStartVoiceRecording();
     const shouldEnable =
+      !overLimit &&
+      (hasText ||
+        hasImages ||
+        hasFiles ||
+        voiceRecordState === 'recording' ||
+        voiceRecordState === 'ready' ||
+        canRecord);
+    const shouldShow =
       hasText ||
       hasImages ||
       hasFiles ||
-      voiceRecordState === 'recording' ||
-      voiceRecordState === 'ready' ||
+      voiceRecordState !== 'idle' ||
       canRecord;
-    const shouldShow = shouldEnable || voiceRecordState !== 'idle' || canRecord;
 
     if (textFieldContainer) {
       if (shouldShow) {
@@ -4617,7 +4642,7 @@ function initializeApp() {
         hideSendBtn();
       }
     }
-    sendBtn.disabled = !shouldEnable;
+    sendBtn.disabled = !shouldEnable || overLimit;
 
     if (hasText || hasImages || hasFiles || voiceRecordState === 'ready') {
       setSendButtonMode('send');
@@ -4641,6 +4666,7 @@ function initializeApp() {
 
   updateVoiceRecordUI();
   updateSendButtonState();
+  updateMessageCharCount();
 
   // Emoji picker button
   if (emojiBtn) {
@@ -4758,6 +4784,12 @@ function initializeApp() {
       loadMessageReads();
     }
   }, 15000);
+
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      refreshAllBubbleThemes();
+    }
+  }, 2000);
 
   let lastSeenMessageId = null;
   setInterval(() => {
