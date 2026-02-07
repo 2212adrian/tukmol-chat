@@ -660,6 +660,36 @@ function initializeApp() {
     applyNotificationToggleState();
   }
 
+  function setOneSignalSubscription(enabled) {
+    if (!window.OneSignalDeferred) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      OneSignalDeferred.push(async function (OneSignal) {
+        try {
+          if (enabled) {
+            if (
+              OneSignal.Notifications?.isPushSupported &&
+              !OneSignal.Notifications.isPushSupported()
+            ) {
+              resolve(false);
+              return;
+            }
+            if (OneSignal.User?.PushSubscription?.optIn) {
+              await OneSignal.User.PushSubscription.optIn();
+            } else if (OneSignal.Notifications?.requestPermission) {
+              await OneSignal.Notifications.requestPermission();
+            }
+          } else if (OneSignal.User?.PushSubscription?.optOut) {
+            await OneSignal.User.PushSubscription.optOut();
+          }
+          const optedIn = OneSignal.User?.PushSubscription?.optedIn;
+          resolve(enabled ? Boolean(optedIn) : optedIn === false);
+        } catch {
+          resolve(false);
+        }
+      });
+    });
+  }
+
   if (notificationToggle) {
     notificationToggle.addEventListener('change', async () => {
       if (notificationToggle.checked) {
@@ -671,8 +701,20 @@ function initializeApp() {
           showToast('Notifications denied. Toggle turned off.', 'warning');
           return;
         }
+        const subscribed = await setOneSignalSubscription(true);
+        if (!subscribed) {
+          notificationsEnabled = false;
+          localStorage.setItem('notifications_enabled', 'false');
+          applyNotificationToggleState();
+          showToast(
+            'Push subscription failed or unsupported. Toggle turned off.',
+            'warning',
+          );
+          return;
+        }
         notificationsEnabled = true;
       } else {
+        await setOneSignalSubscription(false);
         notificationsEnabled = false;
       }
 
@@ -2179,6 +2221,24 @@ function initializeApp() {
     if (!('Notification' in window)) return 'unsupported';
     if (Notification.permission === 'default') {
       try {
+        if (window.OneSignalDeferred) {
+          await new Promise((resolve) => {
+            OneSignalDeferred.push(async function (OneSignal) {
+              try {
+                if (OneSignal.Notifications?.requestPermission) {
+                  await OneSignal.Notifications.requestPermission();
+                } else {
+                  await Notification.requestPermission();
+                }
+              } catch {
+                // ignore
+              } finally {
+                resolve();
+              }
+            });
+          });
+          return Notification.permission;
+        }
         return await Notification.requestPermission();
       } catch {
         return Notification.permission;
@@ -3225,6 +3285,8 @@ function initializeApp() {
             title: `${channelName} • ${sender}`,
             message: preview,
             include_player_ids: oneSignalIds.length ? oneSignalIds : undefined,
+            sender_player_id: oneSignalSubId || undefined,
+            sender_external_user_id: CURRENT_USER?.id || undefined,
           }),
         });
         let payload = null;
