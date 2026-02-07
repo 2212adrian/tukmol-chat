@@ -3539,6 +3539,10 @@ body.dark-mode .reaction-picker-popup {
   box-shadow: 0 2px 6px rgba(239, 68, 68, 0.5);
 }
 
+.channel-unread-badge[hidden] {
+  display: none !important;
+}
+
 @keyframes voice-pulse {
   0% {
     transform: scale(1);

@@ -92,8 +92,12 @@ function initializeApp() {
     // Use the named function to attach the listener only ONCE
     sendBtn.addEventListener('click', handleSendClick);
   }
+  const ACTIVE_ROOM_KEY = 'active_room';
   let ROOM_NAME = 'general-1'; // default room
+  const savedRoom = localStorage.getItem(ACTIVE_ROOM_KEY);
+  if (savedRoom) ROOM_NAME = savedRoom;
   const CURRENT_USER = session.user;
+  const pendingProfileFetches = new Set();
 
   async function fetchMyProfileIfMissing() {
     if (!session?.user) return;
@@ -108,6 +112,44 @@ function initializeApp() {
 
     if (!error && data) {
       profilesByUserId[id] = data;
+    }
+  }
+
+  async function ensureProfileForUserId(userId, userMeta) {
+    if (!supabaseClient || !userId) return;
+    if (profilesByUserId[userId]) return;
+
+    if (userMeta && Object.keys(userMeta).length) {
+      profilesByUserId[userId] = {
+        id: userId,
+        email: userMeta.email || null,
+        avatar_url: userMeta.avatar_url || null,
+        display_name: userMeta.display_name || null,
+        bubble_style: userMeta.bubble_style || null,
+        chat_bg_color: userMeta.chat_bg_color || null,
+        chat_text_color: userMeta.chat_text_color || null,
+        chat_texture: userMeta.chat_texture || null,
+      };
+      return;
+    }
+
+    if (pendingProfileFetches.has(userId)) return;
+    pendingProfileFetches.add(userId);
+    try {
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .select(
+          'id, email, avatar_url, display_name, bubble_style, chat_bg_color, chat_text_color, chat_texture',
+        )
+        .eq('id', userId)
+        .single();
+
+      if (!error && data) {
+        profilesByUserId[userId] = data;
+        applyProfileAppearanceToMessages(userId, data);
+      }
+    } finally {
+      pendingProfileFetches.delete(userId);
     }
   }
 
@@ -302,7 +344,6 @@ function initializeApp() {
   function createMyMessageBubble(text) {
     const { bubbleStyle, bgColor, texture } = window.chatTheme || {};
     const baseColor = bgColor || '#2563eb';
-    bubble.style.color = baseColor;
     const bubble = document.createElement('div');
     bubble.className = 'message-bubble me';
 
@@ -313,8 +354,10 @@ function initializeApp() {
     bubble.style.border = '';
     bubble.style.color = '';
 
+    // determine readable text color for this bubble
+    const textColor = getReadableTextColor(baseColor) || '#f9fafb';
+
     if (bubbleStyle === 'outline') {
-      // soft fill + colored border
       const fill = baseColor + '1A'; // ~10% alpha
       bubble.classList.add('style-outline');
       bubble.style.background = fill;
@@ -323,11 +366,7 @@ function initializeApp() {
       bubble.style.color = textColor;
     } else if (bubbleStyle === 'glass') {
       bubble.classList.add('style-glass');
-      bubble.style.background = `linear-gradient(
-      135deg,
-      ${baseColor}33,
-      rgba(15, 23, 42, 0.9)
-    )`;
+      bubble.style.background = `linear-gradient(135deg, ${baseColor}33, rgba(15, 23, 42, 0.9))`;
       bubble.style.color = '#e5e7eb';
     } else if (bubbleStyle === 'texture' && texture) {
       bubble.classList.add('style-texture');
@@ -503,6 +542,7 @@ function initializeApp() {
 
           if (payload.eventType === 'INSERT') {
             const msg = payload.new;
+            void ensureProfileForUserId(msg.user_id, msg.user_meta);
             if (msg.room_name === ROOM_NAME) {
               if (isMessageInCurrentRoom(msg.id)) {
                 MESSAGE_CONTENT_CACHE[msg.id] = msg.content;
@@ -1205,6 +1245,20 @@ function initializeApp() {
     });
   }
 
+  function setActiveRoomUI(room) {
+    if (roomNameHeader) {
+      roomNameHeader.textContent = itemDisplayNameForRoom(room);
+    }
+    channelItems.forEach((item) => {
+      const itemRoom = item.getAttribute('data-room-name');
+      item.classList.toggle('active', itemRoom === room);
+      if (itemRoom === room) {
+        const timeEl = item.querySelector('.time');
+        if (timeEl) timeEl.textContent = 'Now';
+      }
+    });
+  }
+
   channelItems.forEach((item) => {
     item.addEventListener('click', () => {
       const room = item.getAttribute('data-room-name');
@@ -1217,12 +1271,15 @@ function initializeApp() {
     if (room) ensureChannelBadge(room);
   });
   refreshChannelBadges();
+  setActiveRoomUI(ROOM_NAME);
 
   async function switchRoom(newRoom) {
     if (!newRoom || newRoom === ROOM_NAME) return;
     if (!supabaseClient) return;
 
     ROOM_NAME = newRoom;
+    localStorage.setItem(ACTIVE_ROOM_KEY, newRoom);
+    setActiveRoomUI(newRoom);
     clearChannelUnread(newRoom);
     clearReplyTarget();
     messageReadsByUserId = {};
@@ -1324,7 +1381,29 @@ function initializeApp() {
     const prev = Number(item.dataset.lastMessageTs || 0);
     if (ts && ts < prev) return;
     item.dataset.lastMessageTs = String(ts || prev || 0);
-    timeEl.textContent = createdAt ? formatRelativeTime(createdAt) : timeEl.textContent;
+    const isActive =
+      item.classList.contains('active') || roomName === ROOM_NAME;
+    if (isActive) {
+      timeEl.textContent = 'Now';
+      return;
+    }
+    timeEl.textContent = createdAt
+      ? formatRelativeTime(createdAt)
+      : timeEl.textContent;
+  }
+
+  function refreshChannelTimeLabels() {
+    channelItems.forEach((item) => {
+      const ts = Number(item.dataset.lastMessageTs || 0);
+      if (!ts) return;
+      const timeEl = item.querySelector('.time');
+      if (!timeEl) return;
+      const room = item.getAttribute('data-room-name');
+      const isActive = item.classList.contains('active') || room === ROOM_NAME;
+      timeEl.textContent = isActive
+        ? 'Now'
+        : formatRelativeTime(new Date(ts).toISOString());
+    });
   }
 
   async function refreshChannelTimes() {
@@ -2494,7 +2573,15 @@ function initializeApp() {
     bubble.style.backgroundRepeat = '';
     bubble.style.backgroundSize = '';
     bubble.style.backgroundBlendMode = '';
-    bubble.classList.remove('texture', 'glass', 'outline');
+    // remove both generic and "me"-specific style classes to avoid stale classes
+    bubble.classList.remove(
+      'texture',
+      'glass',
+      'outline',
+      'style-texture',
+      'style-glass',
+      'style-outline',
+    );
     bubble.style.background = '';
     bubble.style.border = '';
     bubble.style.backdropFilter = '';
@@ -2509,25 +2596,37 @@ function initializeApp() {
       bubble.style.backgroundSize = '72px 72px';
       bubble.style.backgroundBlendMode = 'overlay';
       bubble.classList.add('texture');
+      if (bubble.classList.contains('me'))
+        bubble.classList.add('style-texture');
     } else if (style === 'glass') {
-      bubble.style.background = `linear-gradient(
-        135deg,
-        ${bgColor}66,
-        rgba(255,255,255,0.1)
-      )`;
+      bubble.style.background = `linear-gradient(135deg, ${bgColor}66, rgba(255,255,255,0.1))`;
       bubble.style.backdropFilter = 'blur(10px)';
       bubble.style.webkitBackdropFilter = 'blur(10px)';
       bubble.style.border = '1px solid rgba(255,255,255,0.1)';
       bubble.classList.add('glass');
+      if (bubble.classList.contains('me')) bubble.classList.add('style-glass');
     } else if (style === 'outline') {
       const fill = bgColor + '1A';
       bubble.style.background = fill;
       bubble.style.backgroundColor = fill;
       bubble.style.border = `1px solid ${bgColor}`;
       bubble.classList.add('outline');
+      if (bubble.classList.contains('me'))
+        bubble.classList.add('style-outline');
     }
 
     if (textEl) textEl.style.color = textColor || '';
+  }
+
+  function getRowUserMeta(row) {
+    if (!row) return {};
+    const raw = row.dataset?.userMeta;
+    if (!raw) return {};
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return {};
+    }
   }
 
   function applyProfileAppearanceToMessages(userId, profile) {
@@ -2541,9 +2640,10 @@ function initializeApp() {
       const bubble = row.querySelector('.message-bubble');
       if (!bubble) return;
       const textEl = row.querySelector('.message-text');
+      const meta = getRowUserMeta(row);
       applyBubbleTheme(bubble, textEl, {
         user_id: userId,
-        user_meta: {},
+        user_meta: meta,
       });
     });
   }
@@ -2557,9 +2657,10 @@ function initializeApp() {
       const textEl = row.querySelector('.message-text');
       const userId = row.dataset.userId;
       if (!userId) return;
+      const meta = getRowUserMeta(row);
       applyBubbleTheme(bubble, textEl, {
         user_id: userId,
-        user_meta: {},
+        user_meta: meta,
       });
     });
   }
@@ -3087,6 +3188,7 @@ function initializeApp() {
     row.dataset.messageId = msg.id;
     row.dataset.createdAt = msg.created_at;
     row.dataset.userId = msg.user_id;
+    row.dataset.userMeta = JSON.stringify(msg.user_meta || {});
     if (msg.deleted_at) {
       row.classList.add('message-deleted');
       const bubbleEl = row.querySelector('.message-bubble');
@@ -3250,7 +3352,11 @@ function initializeApp() {
         const tmp = document.createElement('div');
         tmp.innerHTML = html;
         tmp.querySelectorAll('[style]').forEach((el) => {
-          el.style.color = '';
+          try {
+            el.style.removeProperty('color');
+          } catch (e) {
+            el.style.color = '';
+          }
         });
 
         textEl.innerHTML = tmp.innerHTML;
@@ -3373,7 +3479,7 @@ function initializeApp() {
     let lastTapAt = 0;
     let isSwiping = false;
     let suppressClick = false;
-    const swipeThreshold = 80;
+    const swipeThreshold = 50;
 
     const createSwipeIndicator = (type) => {
       const el = document.createElement('div');
@@ -3425,12 +3531,12 @@ function initializeApp() {
       const touch = e.touches[0];
       const dx = touch.clientX - touchStartX;
       const dy = touch.clientY - touchStartY;
-      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
         touchMoved = true;
         clearLongPress();
       }
-      const canSwipeLeft = dx < 0 && Math.abs(dy) < 40;
-      const canSwipeRight = isMe && dx > 0 && Math.abs(dy) < 40;
+      const canSwipeLeft = dx < 0 && Math.abs(dy) < 55;
+      const canSwipeRight = isMe && dx > 0 && Math.abs(dy) < 55;
       if (canSwipeLeft || canSwipeRight) {
         isSwiping = true;
         const clamped = Math.max(Math.min(dx, swipeThreshold), -swipeThreshold);
@@ -3559,6 +3665,7 @@ function initializeApp() {
   }
 
   function renderMessage(msg, scroll = true, prepend = false) {
+    void ensureProfileForUserId(msg.user_id, msg.user_meta);
     const row = createMessageRow(msg);
 
     const dateKey = getDateKey(msg?.created_at);
@@ -4037,7 +4144,11 @@ function initializeApp() {
       tmp.innerHTML = html;
       // Sanitize inline styles that marked.js might insert, like color
       tmp.querySelectorAll('[style]').forEach((el) => {
-        el.style.color = '';
+        try {
+          el.style.removeProperty('color');
+        } catch (e) {
+          el.style.color = '';
+        }
       });
       textEl.innerHTML = tmp.innerHTML;
       MESSAGE_CONTENT_CACHE[msg.id] = msg.content;
@@ -4046,6 +4157,14 @@ function initializeApp() {
       } else {
         textEl.style.color = '';
       }
+    }
+
+    // Ensure bubble/theme is reapplied (handles texture/bg/color changes)
+    const bubble = row.querySelector('.message-bubble');
+    if (bubble) {
+      // Keep row user_meta in sync for applyProfileAppearanceToMessages
+      row.dataset.userMeta = JSON.stringify(msg.user_meta || {});
+      applyBubbleTheme(bubble, row.querySelector('.message-text'), msg);
     }
 
     // Add 'edited' badge to the message header
@@ -4525,8 +4644,7 @@ function initializeApp() {
     const emoji = item?.dataset?.emoji;
     if (!emoji) return text;
 
-    const next =
-      text.slice(0, colonIndex) + emoji + text.slice(cursorPos);
+    const next = text.slice(0, colonIndex) + emoji + text.slice(cursorPos);
     return next;
   }
 
@@ -4769,6 +4887,12 @@ function initializeApp() {
   subscribeMessageReads();
   loadInitialReactions();
   refreshChannelTimes();
+  refreshChannelTimeLabels();
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      refreshChannelTimeLabels();
+    }
+  }, 60000);
   loadThemePreference();
   reloadAllReactions();
   markMySeen();
