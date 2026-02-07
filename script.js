@@ -451,8 +451,9 @@ function initializeApp() {
     el.classList.add('show');
   }
 
-  const REACTION_EVENT = 'reaction';
-  const READS_EVENT = 'reads_updated';
+    const MESSAGE_EVENT = 'message';
+    const REACTION_EVENT = 'reaction';
+    const READS_EVENT = 'reads_updated';
   let messageChangesChannel = null;
 
   function subscribeRealtime() {
@@ -485,8 +486,20 @@ function initializeApp() {
         updateTypingIndicator();
       })
 
-      .on('broadcast', { event: REACTION_EVENT }, ({ payload }) => {
-        const reaction = payload;
+        .on('broadcast', { event: MESSAGE_EVENT }, ({ payload }) => {
+          const msg = payload;
+          if (!msg || msg.room_name !== ROOM_NAME) return;
+          if (isMessageInCurrentRoom(msg.id)) return;
+          void ensureProfileForUserId(msg.user_id, msg.user_meta);
+          const atBottom = isNearBottom();
+          renderMessage(msg, atBottom, false);
+          if (!atBottom) newMsgBtn.style.display = 'block';
+          handleIncomingNotification(msg);
+          updateChannelTimeForRoom(msg.room_name, msg.created_at);
+          markMySeen();
+        })
+        .on('broadcast', { event: REACTION_EVENT }, ({ payload }) => {
+          const reaction = payload;
 
         // CRITICAL FIX: The sender already updated the UI optimistically in toggleReaction.
         // Ignore the self-echoed broadcast to prevent double-update/race condition.
@@ -4276,8 +4289,15 @@ function initializeApp() {
       if (error) throw error;
 
       const atBottom = isNearBottom();
-      renderMessage(data, atBottom, false);
-      if (!atBottom) newMsgBtn.style.display = 'block';
+        renderMessage(data, atBottom, false);
+        if (!atBottom) newMsgBtn.style.display = 'block';
+        if (chatChannel) {
+          await chatChannel.send({
+            type: 'broadcast',
+            event: MESSAGE_EVENT,
+            payload: data,
+          });
+        }
 
       try {
         const channelName = itemDisplayNameForRoom(ROOM_NAME);
@@ -4526,8 +4546,15 @@ function initializeApp() {
       if (error) throw error;
 
       const atBottom = isNearBottom();
-      renderMessage(data, atBottom, false);
-      if (!atBottom) newMsgBtn.style.display = 'block';
+        renderMessage(data, atBottom, false);
+        if (!atBottom) newMsgBtn.style.display = 'block';
+        if (chatChannel) {
+          await chatChannel.send({
+            type: 'broadcast',
+            event: MESSAGE_EVENT,
+            payload: data,
+          });
+        }
 
       // ======================
       // PUSH NOTIFICATION (FIXED)
