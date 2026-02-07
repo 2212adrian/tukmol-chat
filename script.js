@@ -3504,11 +3504,12 @@ function initializeApp() {
       }
     };
 
-    bubble.addEventListener('touchstart', (e) => {
-      if (msg.deleted_at) return;
-      const touch = e.touches[0];
-      touchStartX = touch.clientX;
-      touchStartY = touch.clientY;
+      bubble.addEventListener('touchstart', (e) => {
+        if (e.target && e.target.closest('.message-actions')) return;
+        if (msg.deleted_at) return;
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
       touchMoved = false;
       longPressTriggered = false;
       isSwiping = false;
@@ -3526,11 +3527,12 @@ function initializeApp() {
       }, 500);
     });
 
-    bubble.addEventListener('touchmove', (e) => {
-      if (msg.deleted_at) return;
-      const touch = e.touches[0];
-      const dx = touch.clientX - touchStartX;
-      const dy = touch.clientY - touchStartY;
+      bubble.addEventListener('touchmove', (e) => {
+        if (e.target && e.target.closest('.message-actions')) return;
+        if (msg.deleted_at) return;
+        const touch = e.touches[0];
+        const dx = touch.clientX - touchStartX;
+        const dy = touch.clientY - touchStartY;
       if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
         touchMoved = true;
         clearLongPress();
@@ -3558,14 +3560,15 @@ function initializeApp() {
       }
     });
 
-    bubble.addEventListener('touchend', (e) => {
-      clearLongPress();
-      if (longPressTriggered) return;
-      if (msg.deleted_at) return;
+      bubble.addEventListener('touchend', (e) => {
+        clearLongPress();
+        if (longPressTriggered) return;
+        if (msg.deleted_at) return;
+        if (e.target && e.target.closest('.message-actions')) return;
 
-      const touch = e.changedTouches[0];
-      const endX = touch?.clientX ?? touchStartX;
-      const endY = touch?.clientY ?? touchStartY;
+        const touch = e.changedTouches[0];
+        const endX = touch?.clientX ?? touchStartX;
+        const endY = touch?.clientY ?? touchStartY;
       const dx = endX - touchStartX;
       const dy = endY - touchStartY;
 
@@ -3650,12 +3653,13 @@ function initializeApp() {
       }
     });
 
-    bubble.addEventListener('click', (e) => {
-      if (e.detail > 1) return;
-      if (msg.deleted_at) return;
-      if (suppressClick) return;
-      const isHidden = actions.hidden;
-      document
+      bubble.addEventListener('click', (e) => {
+        if (e.detail > 1) return;
+        if (msg.deleted_at) return;
+        if (suppressClick) return;
+        if (e.target && e.target.closest('.message-actions')) return;
+        const isHidden = actions.hidden;
+        document
         .querySelectorAll('.message-actions')
         .forEach((el) => (el.hidden = true));
       actions.hidden = !isHidden;
