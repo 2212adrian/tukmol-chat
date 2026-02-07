@@ -665,11 +665,18 @@ function initializeApp() {
   const markAllReadBtn = document.getElementById('markAllReadBtn');
   const textFieldContainer = document.querySelector('.text-field-container');
   const sidebarUsername = document.getElementById('sidebarUsername');
+  const MAX_SIDEBAR_NAME_LEN = 15;
+  const formatSidebarUsername = (value) => {
+    const name = String(value || '');
+    if (name.length <= MAX_SIDEBAR_NAME_LEN) return name;
+    return `${name.slice(0, MAX_SIDEBAR_NAME_LEN)}...`;
+  };
   const onlineUsersContainer = document.getElementById('onlineUsersContainer');
   const allUsersOverlay = document.getElementById('allUsersOverlay');
   const allUsersList = document.getElementById('allUsersList');
   const allUsersCloseBtn = document.getElementById('allUsersCloseBtn');
-  if (sidebarUsername) sidebarUsername.textContent = CURRENT_USERNAME;
+  if (sidebarUsername)
+    sidebarUsername.textContent = formatSidebarUsername(CURRENT_USERNAME);
 
   if (cancelReplyBtn) {
     cancelReplyBtn.addEventListener('click', () => {
@@ -1448,7 +1455,8 @@ function initializeApp() {
 
   sendBtn.style.display = 'none';
   if (currentUsernameEl) currentUsernameEl.textContent = CURRENT_USERNAME;
-  if (sidebarUsername) sidebarUsername.textContent = CURRENT_USERNAME;
+  if (sidebarUsername)
+    sidebarUsername.textContent = formatSidebarUsername(CURRENT_USERNAME);
   if (textFieldContainer) textFieldContainer.classList.remove('chat-has-text');
   // “New messages” button
   const newMsgBtn = document.createElement('div');
@@ -2454,6 +2462,52 @@ function initializeApp() {
     return { isMe, profile, meta, bgColor, textColor };
   }
 
+  function applyBubbleTheme(bubble, textEl, msg) {
+    if (!bubble || !msg) return;
+    const { profile, meta, bgColor, textColor } = resolveMessageColors(msg);
+    const style = profile.bubble_style || meta.bubble_style || 'solid';
+    const textureUrl = resolveTextureUrl(profile, meta);
+
+    bubble.style.backgroundImage = '';
+    bubble.style.backgroundRepeat = '';
+    bubble.style.backgroundSize = '';
+    bubble.style.backgroundBlendMode = '';
+    bubble.classList.remove('texture', 'glass', 'outline');
+    bubble.style.background = '';
+    bubble.style.border = '';
+    bubble.style.backdropFilter = '';
+    bubble.style.webkitBackdropFilter = '';
+
+    bubble.style.backgroundColor = bgColor;
+    bubble.style.color = textColor || '';
+
+    if (style === 'texture' && textureUrl) {
+      bubble.style.backgroundImage = `url('${textureUrl}')`;
+      bubble.style.backgroundRepeat = 'repeat';
+      bubble.style.backgroundSize = '72px 72px';
+      bubble.style.backgroundBlendMode = 'overlay';
+      bubble.classList.add('texture');
+    } else if (style === 'glass') {
+      bubble.style.background = `linear-gradient(
+        135deg,
+        ${bgColor}66,
+        rgba(255,255,255,0.1)
+      )`;
+      bubble.style.backdropFilter = 'blur(10px)';
+      bubble.style.webkitBackdropFilter = 'blur(10px)';
+      bubble.style.border = '1px solid rgba(255,255,255,0.1)';
+      bubble.classList.add('glass');
+    } else if (style === 'outline') {
+      const fill = bgColor + '1A';
+      bubble.style.background = fill;
+      bubble.style.backgroundColor = fill;
+      bubble.style.border = `1px solid ${bgColor}`;
+      bubble.classList.add('outline');
+    }
+
+    if (textEl) textEl.style.color = textColor || '';
+  }
+
   function applyProfileAppearanceToMessages(userId, profile) {
     if (!messagesEl || !userId) return;
     const rows = messagesEl.querySelectorAll(
@@ -2464,52 +2518,11 @@ function initializeApp() {
     rows.forEach((row) => {
       const bubble = row.querySelector('.message-bubble');
       if (!bubble) return;
-      const style = profile?.bubble_style || 'solid';
-      const textureUrl = profile?.chat_texture || null;
-      const bgColor =
-        profile?.chat_bg_color ||
-        (row.classList.contains('me') ? '#2563eb' : '#1f2937');
-      const textColor =
-        profile?.chat_text_color || getReadableTextColor(bgColor);
-
-      bubble.style.backgroundImage = '';
-      bubble.style.backgroundRepeat = '';
-      bubble.style.backgroundSize = '';
-      bubble.style.backgroundBlendMode = '';
-      bubble.classList.remove('texture', 'glass', 'outline');
-      bubble.style.background = '';
-      bubble.style.border = '';
-      bubble.style.backdropFilter = '';
-      bubble.style.webkitBackdropFilter = '';
-
-      bubble.style.backgroundColor = bgColor;
-      if (style === 'texture' && textureUrl) {
-        bubble.style.backgroundImage = `url('${textureUrl}')`;
-        bubble.style.backgroundRepeat = 'repeat';
-        bubble.style.backgroundSize = '72px 72px';
-        bubble.style.backgroundBlendMode = 'overlay';
-        bubble.classList.add('texture');
-      } else if (style === 'glass') {
-        bubble.style.background = `linear-gradient(
-        135deg,
-        ${bgColor}66,
-        rgba(255,255,255,0.1)
-      )`;
-        bubble.style.backdropFilter = 'blur(10px)';
-        bubble.style.webkitBackdropFilter = 'blur(10px)';
-        bubble.style.border = '1px solid rgba(255,255,255,0.1)';
-        bubble.classList.add('glass');
-      } else if (style === 'outline') {
-        const fill = bgColor + '1A';
-        bubble.style.background = fill;
-        bubble.style.backgroundColor = fill;
-        bubble.style.border = `1px solid ${bgColor}`;
-        bubble.classList.add('outline');
-      }
-
-      bubble.style.color = textColor;
       const textEl = row.querySelector('.message-text');
-      if (textEl) textEl.style.color = textColor;
+      applyBubbleTheme(bubble, textEl, {
+        user_id: userId,
+        user_meta: {},
+      });
     });
   }
 
@@ -3912,6 +3925,7 @@ function initializeApp() {
     if (bubble) {
       bubble.classList.add('message-deleted-bubble');
     }
+    applyBubbleTheme(bubble, content, msg);
 
     row.classList.add('message-leave');
     row.addEventListener(

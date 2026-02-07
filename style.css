@@ -1116,24 +1116,24 @@ body.dark-mode .chat-header {
   gap: 6px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.2);
-  color: rgba(226, 232, 240, 0.9);
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
 .message-row.other .deleted-message {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .deleted-message-name {
-  color: #facc15;
+  color: inherit;
+  font-weight: 700;
 }
 
 .message-deleted-bubble {
   border: 1px dashed rgba(148, 163, 184, 0.45);
-  background: rgba(15, 23, 42, 0.35) !important;
   box-shadow: none;
 }
 
