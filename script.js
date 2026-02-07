@@ -22,7 +22,7 @@ function debugToast(text) {
 // === GLOBAL STATE ===
 let session = null;
 const MESSAGE_REACTIONS = {};
-let reactionChangesChannel = null;
+let profileChangesChannel = null;
 let profilesByUserId = {};
 const LAST_AVATAR_BY_USER_ID = {};
 let typingTimeoutId = null;
@@ -158,6 +158,18 @@ function initializeApp() {
   // === EVENTS (CRITICAL FIX 2: Correct, Single Listener) ===
   function handleSendClick() {
     hideEmojiSuggestions();
+    if (voiceJustStopped) {
+      voiceJustStopped = false;
+      return;
+    }
+    if (voiceRecordState === 'recording') {
+      stopVoiceRecording();
+      return;
+    }
+    if (voiceRecordState === 'ready') {
+      sendVoiceMessage();
+      return;
+    }
     sendMessage();
   }
 
@@ -166,6 +178,31 @@ function initializeApp() {
     sendBtn.removeEventListener('click', handleSendClick);
     // Attach the single, correct listener
     sendBtn.addEventListener('click', handleSendClick);
+
+    sendBtn.addEventListener('pointerdown', (e) => {
+      if (!canStartVoiceRecording()) return;
+      if (voiceRecordState !== 'idle') return;
+      if (voiceHoldTimerId) clearTimeout(voiceHoldTimerId);
+      voiceHoldTimerId = setTimeout(() => {
+        voiceHoldTimerId = null;
+        startVoiceRecording();
+      }, 250);
+      e.preventDefault();
+    });
+
+    const stopIfRecording = () => {
+      if (voiceHoldTimerId) {
+        clearTimeout(voiceHoldTimerId);
+        voiceHoldTimerId = null;
+      }
+      if (voiceRecordState === 'recording') {
+        stopVoiceRecording();
+      }
+    };
+
+    sendBtn.addEventListener('pointerup', stopIfRecording);
+    sendBtn.addEventListener('pointerleave', stopIfRecording);
+    sendBtn.addEventListener('pointercancel', stopIfRecording);
   }
   // ========================================================
 
@@ -321,7 +358,7 @@ function initializeApp() {
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select(
-        'id, email, avatar_url, display_name, bubble_style, chat_bg_color, chat_texture',
+        'id, email, avatar_url, display_name, bubble_style, chat_bg_color, chat_text_color, chat_texture',
       )
       .eq('id', session.user.id)
       .single();
@@ -497,23 +534,57 @@ function initializeApp() {
 
           if (payload.eventType === 'INSERT') {
             const msg = payload.new;
-            msg._notify = true;
-            const atBottom = isNearBottom();
-            renderMessage(msg, atBottom, false);
-            if (!atBottom) newMsgBtn.style.display = 'block';
-            handleIncomingNotification(msg);
-            markMySeen();
+            if (msg.room_name === ROOM_NAME) {
+              msg._notify = true;
+              const atBottom = isNearBottom();
+              renderMessage(msg, atBottom, false);
+              if (!atBottom) newMsgBtn.style.display = 'block';
+              markMySeen();
+            } else {
+              handleIncomingNotification(msg);
+            }
           } else if (payload.eventType === 'UPDATE') {
             const msg = payload.new;
-            if (msg.deleted_at) {
-              applyDeletedMessageToUI(msg); // show "<name> just deleted this message"
-            } else {
-              updateExistingMessageContent(msg); // your edit handler
+            if (msg.room_name === ROOM_NAME) {
+              if (msg.deleted_at) {
+                applyDeletedMessageToUI(msg); // show "<name> just deleted this message"
+              } else {
+                updateExistingMessageContent(msg); // your edit handler
+              }
             }
           } else if (payload.eventType === 'DELETE') {
             const oldMsg = payload.old;
-            removeMessageWithAnimation(oldMsg.id); // remove with fade
+            if (oldMsg?.room_name === ROOM_NAME) {
+              removeMessageWithAnimation(oldMsg.id); // remove with fade
+            }
           }
+        },
+      )
+      .subscribe();
+  }
+
+  function subscribeProfileChanges() {
+    if (!supabaseClient) return;
+
+    if (profileChangesChannel) {
+      supabaseClient.removeChannel(profileChangesChannel);
+      profileChangesChannel = null;
+    }
+
+    profileChangesChannel = supabaseClient
+      .channel('profiles-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+        },
+        (payload) => {
+          const profile = payload.new;
+          if (!profile?.id) return;
+          profilesByUserId[profile.id] = profile;
+          applyProfileTextColorToMessages(profile.id, profile);
         },
       )
       .subscribe();
@@ -522,7 +593,7 @@ function initializeApp() {
   // Function is structurally correct, no change needed here.
   let reactionChannel;
 
-  function subscribeReactionTableChanges(roomName) {
+  function subscribeReactionTableChanges(roomName = ROOM_NAME) {
     if (!supabaseClient) return;
 
     // cleanup old channel if any
@@ -539,7 +610,6 @@ function initializeApp() {
           event: '*',
           schema: 'public',
           table: 'message_reactions',
-          filter: `room_name=eq.${roomName}`, // Requires room_name column added to table
         },
         (payload) => {
           const row = payload.new || payload.old;
@@ -567,9 +637,9 @@ function initializeApp() {
 
   // Add this helper function (uses your local messages cache)
   function isMessageInCurrentRoom(messageId) {
-    // Assumes you have a global MESSAGES array/object with loaded messages for current room
-    return MESSAGES.some(
-      (msg) => msg.id === messageId && msg.room_name === ROOM_NAME,
+    if (!messagesEl || !messageId) return false;
+    return Boolean(
+      messagesEl.querySelector(`.message-row[data-message-id="${messageId}"]`),
     );
   }
 
@@ -586,6 +656,10 @@ function initializeApp() {
   const sendIconEl = document.getElementById('sendIcon');
   const emojiBtn = document.getElementById('emojiBtn');
   const cancelEditBtn = document.getElementById('cancelEditBtn');
+  const voiceRecordBar = document.getElementById('voiceRecordBar');
+  const voiceRecordLabel = document.getElementById('voiceRecordLabel');
+  const voiceRecordTimer = document.getElementById('voiceRecordTimer');
+  const voiceRecordCancelBtn = document.getElementById('voiceRecordCancelBtn');
   const emojiSuggestionsEl = document.getElementById('emojiSuggestions');
   const replyPreviewEl = document.getElementById('replyPreview');
   const replyPreviewNameEl = document.getElementById('replyPreviewName');
@@ -613,6 +687,17 @@ function initializeApp() {
   let unreadNotifications = 0;
   let oneSignalSubId = localStorage.getItem('onesignal_sub_id') || '';
   let cachedOneSignalIds = null;
+  let voiceRecordState = 'idle';
+  let voiceRecorder = null;
+  let voiceRecordStream = null;
+  let voiceRecordChunks = [];
+  let voiceRecordBlob = null;
+  let voiceRecordTimerId = null;
+  let voiceRecordTimeoutId = null;
+  let voiceRecordStartAt = 0;
+  let voiceRecordDiscard = false;
+  let voiceJustStopped = false;
+  let voiceHoldTimerId = null;
 
   function updateNotificationBadge() {
     if (!notificationBadge) return;
@@ -642,6 +727,174 @@ function initializeApp() {
     }
     if (!notificationsEnabled) {
       setNotificationPanelVisible(false);
+    }
+  }
+
+  const SEND_ICON_PATH = 'M2.01 21L23 12 2.01 3 2 10l15 2-15 2z';
+  const MIC_ICON_PATH =
+    'M12 3a4 4 0 0 1 4 4v4a4 4 0 1 1-8 0V7a4 4 0 0 1 4-4zm-1 14.9V21h2v-3.1a7 7 0 0 0 6-6.9h-2a5 5 0 1 1-10 0H5a7 7 0 0 0 6 6.9z';
+  const STOP_ICON_PATH = 'M6 6h12v12H6z';
+  const sendBtnPath = sendBtn?.querySelector?.('svg path') || null;
+  let sendBtnMode = 'send';
+
+  function setSendButtonMode(mode) {
+    if (!sendBtnPath || sendBtnMode === mode) return;
+    sendBtnMode = mode;
+    if (mode === 'mic') {
+      sendBtnPath.setAttribute('d', MIC_ICON_PATH);
+    } else if (mode === 'recording') {
+      sendBtnPath.setAttribute('d', STOP_ICON_PATH);
+    } else {
+      sendBtnPath.setAttribute('d', SEND_ICON_PATH);
+    }
+  }
+
+  function canStartVoiceRecording() {
+    const hasText = messageInput?.value?.trim?.().length > 0;
+    const hasImages = attachedImages.length > 0;
+    const hasFiles = attachedFiles.length > 0;
+    return !editingMessage && !hasText && !hasImages && !hasFiles;
+  }
+
+  function formatVoiceTime(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const m = String(Math.floor(total / 60)).padStart(2, '0');
+    const s = String(total % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  function updateVoiceRecordUI() {
+    if (!voiceRecordBar) return;
+    if (voiceRecordState === 'recording') {
+      voiceRecordBar.hidden = false;
+      if (voiceRecordLabel) voiceRecordLabel.textContent = 'Recording...';
+      setSendButtonMode('recording');
+    } else if (voiceRecordState === 'ready') {
+      voiceRecordBar.hidden = false;
+      if (voiceRecordLabel) voiceRecordLabel.textContent = 'Ready to send';
+      setSendButtonMode('send');
+    } else {
+      voiceRecordBar.hidden = true;
+      setSendButtonMode(canStartVoiceRecording() ? 'mic' : 'send');
+    }
+  }
+
+  function clearVoiceTimers() {
+    if (voiceRecordTimerId) {
+      clearInterval(voiceRecordTimerId);
+      voiceRecordTimerId = null;
+    }
+    if (voiceRecordTimeoutId) {
+      clearTimeout(voiceRecordTimeoutId);
+      voiceRecordTimeoutId = null;
+    }
+  }
+
+  function stopVoiceStream() {
+    if (voiceRecordStream) {
+      voiceRecordStream.getTracks().forEach((t) => t.stop());
+      voiceRecordStream = null;
+    }
+  }
+
+  function startVoiceTimer() {
+    if (!voiceRecordTimer) return;
+    voiceRecordTimer.textContent = '00:00';
+    voiceRecordTimerId = setInterval(() => {
+      const elapsed = Date.now() - voiceRecordStartAt;
+      voiceRecordTimer.textContent = formatVoiceTime(elapsed);
+    }, 200);
+  }
+
+  async function startVoiceRecording() {
+    if (voiceRecordState !== 'idle') return;
+    if (!canStartVoiceRecording()) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      showToast('Audio recording not supported in this browser.', 'warning');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      voiceRecordStream = stream;
+
+      const mimeType = MediaRecorder.isTypeSupported(
+        'audio/webm;codecs=opus',
+      )
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : '';
+
+      voiceRecordChunks = [];
+      voiceRecordBlob = null;
+      voiceRecordDiscard = false;
+      voiceRecordStartAt = Date.now();
+      voiceRecordState = 'recording';
+      updateVoiceRecordUI();
+      startVoiceTimer();
+
+      voiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      voiceRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          voiceRecordChunks.push(e.data);
+        }
+      };
+      voiceRecorder.onstop = () => {
+        clearVoiceTimers();
+        stopVoiceStream();
+        if (voiceRecordDiscard) {
+          voiceRecordChunks = [];
+          voiceRecordBlob = null;
+          voiceRecordState = 'idle';
+          updateVoiceRecordUI();
+          return;
+        }
+        const type = voiceRecorder?.mimeType || 'audio/webm';
+        const blob = new Blob(voiceRecordChunks, { type });
+        voiceRecordBlob = blob.size ? blob : null;
+        voiceRecordState = voiceRecordBlob ? 'ready' : 'idle';
+        updateVoiceRecordUI();
+        if (!voiceRecordBlob) {
+          showToast('Recording failed. Please try again.', 'error');
+        }
+      };
+
+      voiceRecorder.start();
+      voiceRecordTimeoutId = setTimeout(() => {
+        stopVoiceRecording(true);
+      }, 30000);
+    } catch (err) {
+      voiceRecordState = 'idle';
+      updateVoiceRecordUI();
+      showToast(
+        'Microphone access denied or unavailable.',
+        'warning',
+      );
+    }
+  }
+
+  function stopVoiceRecording(fromTimeout = false) {
+    if (voiceRecordState !== 'recording' || !voiceRecorder) return;
+    voiceJustStopped = true;
+    clearVoiceTimers();
+    if (fromTimeout) {
+      showToast('Recording stopped at 30 seconds.', 'info');
+    }
+    voiceRecorder.stop();
+  }
+
+  function cancelVoiceRecording() {
+    voiceRecordDiscard = true;
+    if (voiceRecordState === 'recording' && voiceRecorder) {
+      voiceRecorder.stop();
+    } else {
+      clearVoiceTimers();
+      stopVoiceStream();
+      voiceRecordChunks = [];
+      voiceRecordBlob = null;
+      voiceRecordState = 'idle';
+      updateVoiceRecordUI();
     }
   }
 
@@ -733,6 +986,20 @@ function initializeApp() {
     });
   }
 
+  if (voiceRecordCancelBtn) {
+    voiceRecordCancelBtn.addEventListener('click', () => {
+      cancelVoiceRecording();
+      updateSendButtonState();
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!notificationPanel || notificationPanel.hidden) return;
+    if (notificationPanel.contains(e.target)) return;
+    if (notificationBtn && notificationBtn.contains(e.target)) return;
+    setNotificationPanelVisible(false);
+  });
+
   if (markAllReadBtn) {
     markAllReadBtn.addEventListener('click', () => {
       if (notificationList) {
@@ -815,9 +1082,9 @@ function initializeApp() {
       supabaseClient.removeChannel(chatChannel);
       chatChannel = null;
     }
-    if (reactionChangesChannel) {
-      supabaseClient.removeChannel(reactionChangesChannel);
-      reactionChangesChannel = null;
+    if (reactionChannel) {
+      supabaseClient.removeChannel(reactionChannel);
+      reactionChannel = null;
     }
     if (readChangesChannel) {
       supabaseClient.removeChannel(readChangesChannel);
@@ -844,7 +1111,7 @@ function initializeApp() {
     // 5) Re‑subscribe realtime & presence for the new room
     subscribeRealtime(); // messages + typing + REACTION_EVENT (broadcast)
     subscribeMessageChanges(); // 👈 CALL the function
-    subscribeReactionTableChanges(); // EITHER keep this OR broadcast, not both
+    subscribeReactionTableChanges(ROOM_NAME); // EITHER keep this OR broadcast, not both
     subscribeMessageReads();
     await setupPresence(); // presence for ROOM_NAME
     markMySeen();
@@ -881,18 +1148,7 @@ function initializeApp() {
     const hasImages = attachedImages.length > 0;
     const hasFiles = attachedFiles.length > 0;
 
-    // 1) show / hide send button depending on text / images
-    if (textFieldContainer) {
-      if (hasText || hasImages || hasFiles) {
-        textFieldContainer.classList.add('chat-has-text');
-        showSendBtn();
-      } else {
-        textFieldContainer.classList.remove('chat-has-text');
-        hideSendBtn();
-      }
-    }
-
-    // 2) emoji suggestions
+    // emoji suggestions
     if (!emojiSuggestionsEl) return;
     const value = messageInput.value;
     const cursorPos = messageInput.selectionStart || 0;
@@ -913,6 +1169,9 @@ function initializeApp() {
 
   // === CLEANED INPUT LISTENER (REPLACE THE ENTIRE OLD ONE) ===
   messageInput.addEventListener('input', () => {
+    if (voiceRecordState === 'ready') {
+      cancelVoiceRecording();
+    }
     // Auto-grow for multiline textarea
     messageInput.style.height = 'auto';
     messageInput.style.height = messageInput.scrollHeight + 'px';
@@ -1092,6 +1351,9 @@ function initializeApp() {
 
   function addAttachmentFiles(files) {
     if (!files || !files.length) return;
+    if (voiceRecordState !== 'idle') {
+      cancelVoiceRecording();
+    }
 
     for (const file of files) {
       if (file.type.startsWith('image/')) {
@@ -1385,7 +1647,12 @@ function initializeApp() {
 
       chip.onclick = (e) => {
         e.stopPropagation();
-        openReactionDetails(messageId, emoji, containerEl); // just open/close list
+        toggleReaction(messageId, emoji); // toggle add/remove quickly
+      };
+      chip.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openReactionDetails(messageId, emoji, containerEl); // details on right-click
       };
 
       containerEl.appendChild(chip);
@@ -1588,8 +1855,6 @@ function initializeApp() {
       }
 
       applyReactionToCacheAndUI(reaction);
-      loadMessages();
-      await reloadAllReactions();
 
       if (chatChannel) {
         await chatChannel.send({
@@ -1816,6 +2081,21 @@ function initializeApp() {
     return lum > 0.5 ? '#111827' : '#f9fafb';
   }
 
+  function cssColorToHex(color) {
+    if (!color) return null;
+    if (color.startsWith('#')) return color;
+    const match = color.match(
+      /rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i,
+    );
+    if (!match) return null;
+    const r = Number(match[1]);
+    const g = Number(match[2]);
+    const b = Number(match[3]);
+    if ([r, g, b].some((v) => Number.isNaN(v))) return null;
+    const toHex = (v) => v.toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
   function resolveMessageColors(msg) {
     const isMe = msg.user_id === session?.user?.id;
     const profile = profilesByUserId[msg.user_id] || {};
@@ -1833,6 +2113,32 @@ function initializeApp() {
       (isMe ? '#f9fafb' : getReadableTextColor(bgColor));
 
     return { isMe, profile, meta, bgColor, textColor };
+  }
+
+  function applyProfileTextColorToMessages(userId, profile) {
+    if (!messagesEl || !userId) return;
+    const rows = messagesEl.querySelectorAll(
+      `.message-row[data-user-id="${userId}"]`,
+    );
+    if (!rows.length) return;
+
+    rows.forEach((row) => {
+      const bubble = row.querySelector('.message-bubble');
+      if (!bubble) return;
+
+      let textColor = profile?.chat_text_color || null;
+      if (!textColor) {
+        const bg = getComputedStyle(bubble).backgroundColor;
+        const hex = cssColorToHex(bg);
+        textColor = hex ? getReadableTextColor(hex) : null;
+      }
+
+      if (textColor) {
+        bubble.style.color = textColor;
+        const textEl = row.querySelector('.message-text');
+        if (textEl) textEl.style.color = textColor;
+      }
+    });
   }
 
   function extractSingleGifUrl(text) {
@@ -2152,7 +2458,8 @@ function initializeApp() {
   function getNotificationText(msg) {
     if (!msg || msg.deleted_at) return '';
     const raw = typeof msg.content === 'string' ? msg.content.trim() : '';
-    if (raw && raw !== '[image]') return raw;
+    if (raw && raw !== '[image]' && raw !== '[audio]') return raw;
+    if (raw === '[audio]') return 'Voice message';
     const hasImages =
       (Array.isArray(msg.image_urls) && msg.image_urls.length) || msg.image_url;
     if (hasImages) return '[image]';
@@ -2317,6 +2624,7 @@ function initializeApp() {
     row.className = 'message-row ' + (isMe ? 'me' : 'other');
     row.dataset.messageId = msg.id;
     row.dataset.createdAt = msg.created_at;
+    row.dataset.userId = msg.user_id;
     if (msg.deleted_at) {
       row.classList.add('message-deleted');
     }
@@ -2519,25 +2827,38 @@ function initializeApp() {
     }
 
     if (!msg.deleted_at && msg.file_url) {
-      const fileCard = document.createElement('a');
-      fileCard.className = 'message-file';
-      fileCard.href = msg.file_url;
-      fileCard.target = '_blank';
-      fileCard.rel = 'noreferrer';
+      const isAudio =
+        (msg.file_type && msg.file_type.startsWith('audio/')) ||
+        msg.content === '[audio]';
 
-      const fileName = document.createElement('div');
-      fileName.className = 'message-file-name';
-      fileName.textContent = msg.file_name || 'Document';
+      if (isAudio) {
+        const audio = document.createElement('audio');
+        audio.className = 'message-audio';
+        audio.controls = true;
+        audio.src = msg.file_url;
+        audio.preload = 'metadata';
+        bubble.appendChild(audio);
+      } else {
+        const fileCard = document.createElement('a');
+        fileCard.className = 'message-file';
+        fileCard.href = msg.file_url;
+        fileCard.target = '_blank';
+        fileCard.rel = 'noreferrer';
 
-      const fileSize = document.createElement('div');
-      fileSize.className = 'message-file-size';
-      fileSize.textContent = msg.file_size
-        ? formatFileSize(Number(msg.file_size))
-        : '';
+        const fileName = document.createElement('div');
+        fileName.className = 'message-file-name';
+        fileName.textContent = msg.file_name || 'Document';
 
-      fileCard.appendChild(fileName);
-      fileCard.appendChild(fileSize);
-      bubble.appendChild(fileCard);
+        const fileSize = document.createElement('div');
+        fileSize.className = 'message-file-size';
+        fileSize.textContent = msg.file_size
+          ? formatFileSize(Number(msg.file_size))
+          : '';
+
+        fileCard.appendChild(fileName);
+        fileCard.appendChild(fileSize);
+        bubble.appendChild(fileCard);
+      }
     }
 
     if (!msg.deleted_at && allUrls.length) {
@@ -3097,6 +3418,168 @@ function initializeApp() {
   }
 
   // === SEND MESSAGE ===
+  async function sendVoiceMessage() {
+    if (!supabaseClient || !voiceRecordBlob) return;
+    if (!session?.user) return;
+
+    const CURRENT_USER = session.user;
+    const userDisplayName = getDisplayNameFromUser(CURRENT_USER);
+    const myProfile = profilesByUserId[CURRENT_USER.id];
+
+    const userAvatarPath =
+      myProfile?.avatar_url || null
+        ? supabaseClient.storage
+            .from('profile-pictures')
+            .getPublicUrl(myProfile.avatar_url).data.publicUrl
+        : null;
+
+    const bubbleStyle = myProfile?.bubble_style || 'solid';
+    const chatBgColor = myProfile?.chat_bg_color || '#2563eb';
+    const chatTextColor = myProfile?.chat_text_color || null;
+    const chatTexture = myProfile?.chat_texture || null;
+
+    sendBtn.disabled = true;
+
+    try {
+      const ext = voiceRecordBlob.type.includes('ogg')
+        ? 'ogg'
+        : voiceRecordBlob.type.includes('wav')
+          ? 'wav'
+          : 'webm';
+      const fileName = `voice-${Date.now()}.${ext}`;
+      showToast('Uploading voice message...', 'info');
+
+      const { data: uploadData, error: uploadError } =
+        await supabaseClient.storage
+          .from('chat-files')
+          .upload(fileName, voiceRecordBlob, {
+            upsert: true,
+            contentType: voiceRecordBlob.type || 'audio/webm',
+          });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData, error: urlError } = supabaseClient.storage
+        .from('chat-files')
+        .getPublicUrl(uploadData.path);
+
+      if (urlError) throw urlError;
+
+      const replyPayload = replyingTo
+        ? {
+            reply_to_id: replyingTo.id,
+            reply_to_user_name: replyingTo.user,
+            reply_to_content: replyingTo.preview,
+          }
+        : {};
+
+      const payload = {
+        room_name: ROOM_NAME,
+        user_id: CURRENT_USER.id,
+        user_name: CURRENT_USER.email,
+        user_meta: {
+          display_name: userDisplayName,
+          avatar_url: userAvatarPath,
+          bubble_style: bubbleStyle,
+          chat_bg_color: chatBgColor,
+          chat_text_color: chatTextColor,
+          chat_texture: chatTexture,
+        },
+        content: '[audio]',
+        type: 'audio',
+        file_url: urlData.publicUrl,
+        file_name: 'Voice message',
+        file_size: voiceRecordBlob.size,
+        file_type: voiceRecordBlob.type || 'audio/webm',
+        ...replyPayload,
+      };
+
+      const { data, error } = await supabaseClient
+        .from('messages')
+        .insert(payload)
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      const atBottom = isNearBottom();
+      renderMessage(data, atBottom, false);
+      if (!atBottom) newMsgBtn.style.display = 'block';
+
+      try {
+        const channelName = itemDisplayNameForRoom(ROOM_NAME);
+        const sender = userDisplayName || CURRENT_USER.email || 'Someone';
+        const preview = getNotificationText(data) || 'Voice message';
+        const oneSignalIds = await fetchOneSignalIds();
+        const res = await fetch('/.netlify/functions/onesignal-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `${channelName} â€¢ ${sender}`,
+            message: preview,
+            include_player_ids: oneSignalIds.length ? oneSignalIds : undefined,
+            sender_player_id: oneSignalSubId || undefined,
+            sender_external_user_id: CURRENT_USER?.id || undefined,
+          }),
+        });
+        let pushPayload = null;
+        try {
+          pushPayload = await res.json();
+        } catch {
+          pushPayload = null;
+        }
+
+        if (!pushPayload || pushPayload.ok === false || !res.ok) {
+          const errMsg =
+            pushPayload?.data?.errors?.join?.(', ') ||
+            pushPayload?.data?.error ||
+            pushPayload?.raw ||
+            'Unknown error';
+          showToast(
+            `Push failed (${pushPayload?.status || res.status}): ${errMsg}`,
+            'error',
+          );
+        } else {
+          const recipients =
+            pushPayload?.data?.recipients ??
+            pushPayload?.data?.id ??
+            pushPayload?.recipients;
+          const info = recipients
+            ? ` Recipients: ${recipients}`
+            : ' (no recipients)';
+          showToast(`Push queued.${info}`, 'success');
+        }
+      } catch (err) {
+        showToast(
+          'Push send failed: ' + (err.message || 'Unknown error'),
+          'error',
+        );
+      }
+
+      await chatChannel.send({
+        type: 'broadcast',
+        event: 'message',
+        payload: data,
+      });
+
+      clearReplyTarget();
+    } catch (err) {
+      logError('Voice send error', err);
+      showToast(
+        'Failed to send voice message: ' +
+          (err.message || 'Unknown error'),
+        'error',
+      );
+    } finally {
+      voiceRecordBlob = null;
+      voiceRecordChunks = [];
+      voiceRecordState = 'idle';
+      updateVoiceRecordUI();
+      updateSendButtonState();
+      sendBtn.disabled = false;
+    }
+  }
+
   async function sendMessage() {
     if (!supabaseClient) return;
     if (!canSendNow()) return;
@@ -3372,6 +3855,17 @@ function initializeApp() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       hideEmojiSuggestions();
+      if (voiceRecordState === 'recording') {
+        stopVoiceRecording();
+        return;
+      }
+      if (voiceRecordState === 'ready') {
+        if (!messageInput.value.trim()) {
+          sendVoiceMessage();
+          return;
+        }
+        cancelVoiceRecording();
+      }
       sendMessage();
     }
     if (e.key === 'Escape' && editingMessage) {
@@ -3430,10 +3924,19 @@ function initializeApp() {
     const hasText = messageInput.value.trim().length > 0;
     const hasImages = attachedImages.length > 0;
     const hasFiles = attachedFiles.length > 0;
-    const shouldEnable = hasText || hasImages || hasFiles;
+    const canRecord = canStartVoiceRecording();
+    const shouldEnable =
+      hasText ||
+      hasImages ||
+      hasFiles ||
+      voiceRecordState === 'recording' ||
+      voiceRecordState === 'ready' ||
+      canRecord;
+    const shouldShow =
+      shouldEnable || voiceRecordState !== 'idle' || canRecord;
 
     if (textFieldContainer) {
-      if (shouldEnable) {
+      if (shouldShow) {
         textFieldContainer.classList.add('chat-has-text');
         showSendBtn();
       } else {
@@ -3442,6 +3945,16 @@ function initializeApp() {
       }
     }
     sendBtn.disabled = !shouldEnable;
+
+    if (hasText || hasImages || hasFiles || voiceRecordState === 'ready') {
+      setSendButtonMode('send');
+    } else if (voiceRecordState === 'recording') {
+      setSendButtonMode('recording');
+    } else if (canRecord) {
+      setSendButtonMode('mic');
+    } else {
+      setSendButtonMode('send');
+    }
   }
 
   sendBtn.addEventListener('transitionend', (e) => {
@@ -3452,6 +3965,9 @@ function initializeApp() {
       sendBtn.style.display = 'none';
     }
   });
+
+  updateVoiceRecordUI();
+  updateSendButtonState();
 
   // Emoji picker button
   if (emojiBtn) {
@@ -3523,7 +4039,8 @@ function initializeApp() {
   setupPresence();
   subscribeRealtime();
   subscribeMessageChanges();
-  subscribeReactionTableChanges();
+  subscribeProfileChanges();
+  subscribeReactionTableChanges(ROOM_NAME);
   subscribeMessageReads();
   loadInitialReactions();
   loadThemePreference();
@@ -4187,9 +4704,9 @@ async function refreshChat() {
       supabaseClient.removeChannel(chatChannel);
       chatChannel = null;
     }
-    if (reactionChangesChannel) {
-      supabaseClient.removeChannel(reactionChangesChannel);
-      reactionChangesChannel = null;
+    if (reactionChannel) {
+      supabaseClient.removeChannel(reactionChannel);
+      reactionChannel = null;
     }
 
     // 4) Reload from DB (same as init)
@@ -4201,7 +4718,7 @@ async function refreshChat() {
     loadImageViewerPartial();
     setupPresence();
     subscribeRealtime();
-    subscribeReactionTableChanges(); // <- call it
+    subscribeReactionTableChanges(ROOM_NAME); // <- call it
     subscribeMessageReads();
     markMySeen();
     // refreshChatBtn.disabled = false;
