@@ -429,34 +429,6 @@ function initializeApp() {
     });
 
     chatChannel
-      .on('broadcast', { event: 'message' }, ({ payload }) => {
-        const msg = payload;
-
-        // --- CRITICAL FIX: PREVENT SELF-DUPLICATION (ECHO) ---
-        // The local client's sendMessage already rendered this message optimistically.
-        // Ignore the broadcast if the sender ID matches the current session user ID.
-        if (msg.user_id === session.user.id) {
-          return;
-        }
-        // --------------------------------------------------------
-
-        msg._notify = true;
-        const atBottom = isNearBottom();
-        renderMessage(msg, atBottom, false);
-        if (!atBottom) newMsgBtn.style.display = 'block';
-        handleIncomingNotification(msg);
-        markMySeen();
-      })
-      // === NEW LISTENER: Handle explicit broadcast for deleted messages ===
-      .on('broadcast', { event: 'message_deleted' }, ({ payload }) => {
-        const msg = payload; // The payload is the updated message row with deleted_at set
-        applyDeletedMessageToUI(msg);
-      })
-      .on('broadcast', { event: 'message_edited' }, ({ payload }) => {
-        const msg = payload; // The payload is the updated message row
-        updateExistingMessageContent(msg);
-      })
-      // ===================================================================
       .on('broadcast', { event: TYPING_EVENT }, ({ payload }) => {
         const { username, isTyping, room } = payload || {};
         if (!username || room !== ROOM_NAME || username === CURRENT_USERNAME)
@@ -532,6 +504,12 @@ function initializeApp() {
           if (payload.eventType === 'INSERT') {
             const msg = payload.new;
             if (msg.room_name === ROOM_NAME) {
+              if (isMessageInCurrentRoom(msg.id)) {
+                MESSAGE_CONTENT_CACHE[msg.id] = msg.content;
+                updateExistingMessageContent(msg);
+                updateChannelTimeForRoom(msg.room_name, msg.created_at);
+                return;
+              }
               msg._notify = true;
               const atBottom = isNearBottom();
               renderMessage(msg, atBottom, false);
@@ -1907,15 +1885,47 @@ function initializeApp() {
         chip.classList.add('active');
       }
 
-      chip.onclick = (e) => {
-        e.stopPropagation();
-        toggleReaction(messageId, emoji); // toggle add/remove quickly
+      let pressTimer = null;
+      let longPressed = false;
+      let suppressChipClick = false;
+      const clearPress = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
       };
-      chip.oncontextmenu = (e) => {
+      chip.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        longPressed = false;
+        clearPress();
+        pressTimer = setTimeout(() => {
+          longPressed = true;
+          openReactionDetails(messageId, emoji, containerEl);
+          clearPress();
+        }, 250);
+      });
+      chip.addEventListener('touchend', (e) => {
+        e.stopPropagation();
+        clearPress();
+        if (!longPressed) {
+          toggleReaction(messageId, emoji);
+          suppressChipClick = true;
+          setTimeout(() => {
+            suppressChipClick = false;
+          }, 200);
+        }
+      });
+      chip.addEventListener('touchmove', clearPress);
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (suppressChipClick) return;
+        toggleReaction(messageId, emoji); // toggle add/remove quickly
+      });
+      chip.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
         openReactionDetails(messageId, emoji, containerEl); // details on right-click
-      };
+      });
 
       containerEl.appendChild(chip);
     });
@@ -3031,6 +3041,8 @@ function initializeApp() {
     row.dataset.userId = msg.user_id;
     if (msg.deleted_at) {
       row.classList.add('message-deleted');
+      const bubbleEl = row.querySelector('.message-bubble');
+      if (bubbleEl) bubbleEl.classList.add('message-deleted-bubble');
     }
 
     // BUBBLE
@@ -3209,7 +3221,8 @@ function initializeApp() {
 
     if (msg.deleted_at) {
       const name = msg.deleted_by_name || displayName || 'Someone';
-      textEl.textContent = `${name} just deleted this message`;
+      const safeName = escapeHtml(name);
+      textEl.innerHTML = `<span class="deleted-message"><span class="deleted-message-name">${safeName}</span> just deleted this message</span>`;
     } else if (msg.content) {
       gifUrlFromText = extractSingleGifUrl(msg.content);
 
@@ -3369,7 +3382,6 @@ function initializeApp() {
 
     bubble.addEventListener('touchstart', (e) => {
       if (msg.deleted_at) return;
-      if (msg.deleted_at) return;
       const touch = e.touches[0];
       touchStartX = touch.clientX;
       touchStartY = touch.clientY;
@@ -3391,6 +3403,7 @@ function initializeApp() {
     });
 
     bubble.addEventListener('touchmove', (e) => {
+      if (msg.deleted_at) return;
       const touch = e.touches[0];
       const dx = touch.clientX - touchStartX;
       const dy = touch.clientY - touchStartY;
@@ -3424,6 +3437,7 @@ function initializeApp() {
     bubble.addEventListener('touchend', (e) => {
       clearLongPress();
       if (longPressTriggered) return;
+      if (msg.deleted_at) return;
 
       const touch = e.changedTouches[0];
       const endX = touch?.clientX ?? touchStartX;
@@ -3456,7 +3470,7 @@ function initializeApp() {
       }
 
       // Swipe right to delete (own only)
-      if (isSwiping && dx > 60 && Math.abs(dy) < 40) {
+      if (isSwiping && dx > 40 && Math.abs(dy) < 40) {
         if (isMe) {
           deleteMessage(msg);
         }
@@ -3878,6 +3892,7 @@ function initializeApp() {
     if (!row) return;
 
     row.querySelectorAll('.edit-badge').forEach((b) => b.remove());
+    row.querySelectorAll('.message-actions').forEach((a) => (a.hidden = true));
 
     const content = row.querySelector('.message-text');
     if (content) {
@@ -3968,12 +3983,6 @@ function initializeApp() {
         // Do not throw, as the message deletion itself succeeded.
       }
       // =======================================================
-
-      await chatChannel.send({
-        type: 'broadcast',
-        event: 'message_deleted', // Use a new custom event name
-        payload: data, // Send the full updated object, including deleted_at
-      });
 
       // Optimistic UI update for yourself
       applyDeletedMessageToUI(data);
@@ -4174,12 +4183,6 @@ function initializeApp() {
         );
       }
 
-      await chatChannel.send({
-        type: 'broadcast',
-        event: 'message',
-        payload: data,
-      });
-
       clearReplyTarget();
     } catch (err) {
       logError('Voice send error', err);
@@ -4256,12 +4259,6 @@ function initializeApp() {
         if (error) throw error;
 
         updateExistingMessageContent(data);
-
-        await chatChannel.send({
-          type: 'broadcast',
-          event: 'message_edited',
-          payload: data,
-        });
 
         showToast('Message edited.', 'success');
         cancelEdit();
@@ -4410,12 +4407,6 @@ function initializeApp() {
           'error',
         );
       }
-
-      await chatChannel.send({
-        type: 'broadcast',
-        event: 'message',
-        payload: data,
-      });
 
       clearReplyTarget();
     } catch (err) {
