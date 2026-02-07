@@ -2678,27 +2678,37 @@ function initializeApp() {
       );
       return [];
     }
-    const ids =
-      data?.map((row) => row.onesignal_id).filter(Boolean) || [];
+    const ids = data?.map((row) => row.onesignal_id).filter(Boolean) || [];
     cachedOneSignalIds = ids;
     return ids;
   }
 
   async function syncOneSignalIdentity() {
     if (!window.OneSignalDeferred || !session?.user?.id) return;
+
     OneSignalDeferred.push(async function (OneSignal) {
       try {
-        if (typeof OneSignal.login === 'function') {
+        if (
+          typeof OneSignal.login === 'function' &&
+          OneSignal.User?.externalId !== session.user.id
+        ) {
           await OneSignal.login(session.user.id);
         }
+
+        const isSubscribed =
+          await OneSignal.User?.PushSubscription?.getOptedIn?.();
+
+        if (isSubscribed) {
+          await OneSignal.User.addTag('user_id', session.user.id);
+        }
+
         const subId = OneSignal.User?.PushSubscription?.id;
         if (subId) setOneSignalSubId(subId);
       } catch {
-        // ignore
+        // intentionally ignored
       }
     });
   }
-
 
   // === LOAD INITIAL MESSAGES ===
   async function loadMessages() {
@@ -3094,7 +3104,9 @@ function initializeApp() {
     const rawText = messageInput.value.trim();
     const filesToUpload = attachedImages.map((i) => i.file);
     const docToUpload = attachedFiles[0]?.file || null;
+
     if (!rawText && !filesToUpload.length && !docToUpload) return;
+
     if (docToUpload && docToUpload.size > 20 * 1024 * 1024) {
       showToast('Document is too large (max 20MB).', 'warning');
       return;
@@ -3104,28 +3116,29 @@ function initializeApp() {
     const userDisplayName = getDisplayNameFromUser(CURRENT_USER);
     const myProfile = profilesByUserId[CURRENT_USER.id];
 
-    const userAvatarPath =
-      myProfile?.avatar_url || null
-        ? supabaseClient.storage
-            .from('profile-pictures')
-            .getPublicUrl(myProfile.avatar_url).data.publicUrl
-        : null;
+    const userAvatarPath = myProfile?.avatar_url
+      ? supabaseClient.storage
+          .from('profile-pictures')
+          .getPublicUrl(myProfile.avatar_url).data.publicUrl
+      : null;
 
     const bubbleStyle = myProfile?.bubble_style || 'solid';
     const chatBgColor = myProfile?.chat_bg_color || '#2563eb';
     const chatTextColor = myProfile?.chat_text_color || null;
     const chatTexture = myProfile?.chat_texture || null;
 
+    // ======================
     // EDIT MODE
+    // ======================
     if (editingMessage) {
       if (!rawText) {
         showToast('Message cannot be empty.', 'warning');
         return;
       }
 
-      const processedText = convertShortcodesToEmoji(rawText);
-
       try {
+        const processedText = convertShortcodesToEmoji(rawText);
+
         const { data, error } = await supabaseClient
           .from('messages')
           .update({
@@ -3151,78 +3164,66 @@ function initializeApp() {
         return;
       } catch (err) {
         logError('Edit error', err);
-        showToast(
-          'Failed to edit: ' + (err.message || 'Unknown error'),
-          'error',
-        );
+        showToast(`Failed to edit: ${err.message || 'Unknown error'}`, 'error');
         return;
       }
     }
 
+    // ======================
     // CREATE MODE
-    if (!rawText && !filesToUpload.length && !docToUpload) return;
-
+    // ======================
     sendBtn.disabled = true;
 
     try {
       const uploadedUrls = [];
 
+      // ---- Upload images ----
       for (const file of filesToUpload) {
         if (file.size > 8 * 1024 * 1024) {
           showToast(`Image "${file.name}" is too large (max 8MB).`, 'warning');
           continue;
         }
 
-        showToast(`Uploading ${file.name}...`, 'info');
         const fileName = `${Date.now()}-${file.name}`;
-        logInfo(
-          '[Chat] Uploading to bucket chat-images. File name: ' + fileName,
-        );
+        showToast(`Uploading ${file.name}...`, 'info');
 
-        const { data: uploadData, error: uploadError } =
-          await supabaseClient.storage
-            .from('chat-images')
-            .upload(fileName, file, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData, error: urlError } = supabaseClient.storage
+        const { data, error } = await supabaseClient.storage
           .from('chat-images')
-          .getPublicUrl(uploadData.path);
+          .upload(fileName, file, { upsert: true });
 
-        if (urlError) throw urlError;
+        if (error) throw error;
+
+        const { data: urlData } = supabaseClient.storage
+          .from('chat-images')
+          .getPublicUrl(data.path);
 
         uploadedUrls.push(urlData.publicUrl);
-        logInfo('[Chat] Image URL: ' + urlData.publicUrl);
       }
 
+      // ---- Upload document ----
       let uploadedDocUrl = null;
+
       if (docToUpload) {
         showToast(`Uploading ${docToUpload.name}...`, 'info');
+
         const docFileName = `${Date.now()}-${docToUpload.name}`;
-        const { data: docUploadData, error: docUploadError } =
-          await supabaseClient.storage
-            .from('chat-files')
-            .upload(docFileName, docToUpload, { upsert: true });
-
-        if (docUploadError) throw docUploadError;
-
-        const { data: docUrlData, error: docUrlError } = supabaseClient.storage
+        const { data, error } = await supabaseClient.storage
           .from('chat-files')
-          .getPublicUrl(docUploadData.path);
+          .upload(docFileName, docToUpload, { upsert: true });
 
-        if (docUrlError) throw docUrlError;
-        uploadedDocUrl = docUrlData.publicUrl;
+        if (error) throw error;
+
+        const { data: urlData } = supabaseClient.storage
+          .from('chat-files')
+          .getPublicUrl(data.path);
+
+        uploadedDocUrl = urlData.publicUrl;
       }
 
       const processedText = convertShortcodesToEmoji(rawText);
-      const hasText = processedText.trim().length > 0;
+      const hasText = processedText.length > 0;
       const hasImages = uploadedUrls.length > 0;
       const hasFile = Boolean(uploadedDocUrl);
-      if (docToUpload && !hasFile && !hasText && !hasImages) {
-        showToast('Failed to upload document.', 'error');
-        return;
-      }
 
       const replyPayload = replyingTo
         ? {
@@ -3255,9 +3256,9 @@ function initializeApp() {
         image_url: uploadedUrls[0] || null,
         image_urls: hasImages ? uploadedUrls : null,
         file_url: uploadedDocUrl,
-        file_name: docToUpload ? docToUpload.name : null,
-        file_size: docToUpload ? docToUpload.size : null,
-        file_type: docToUpload ? docToUpload.type : null,
+        file_name: docToUpload?.name || null,
+        file_size: docToUpload?.size || null,
+        file_type: docToUpload?.type || null,
         ...replyPayload,
       };
 
@@ -3273,54 +3274,34 @@ function initializeApp() {
       renderMessage(data, atBottom, false);
       if (!atBottom) newMsgBtn.style.display = 'block';
 
+      // ======================
+      // PUSH NOTIFICATION (FIXED)
+      // ======================
       try {
         const channelName = itemDisplayNameForRoom(ROOM_NAME);
         const sender = userDisplayName || CURRENT_USER.email || 'Someone';
         const preview = getNotificationText(data) || 'New message';
-        const oneSignalIds = await fetchOneSignalIds();
+
         const res = await fetch('/.netlify/functions/onesignal-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: `${channelName} • ${sender}`,
             message: preview,
-            include_player_ids: oneSignalIds.length ? oneSignalIds : undefined,
-            sender_player_id: oneSignalSubId || undefined,
-            sender_external_user_id: CURRENT_USER?.id || undefined,
+            sender_external_user_id: CURRENT_USER.id, // exclude sender
           }),
         });
-        let payload = null;
-        try {
-          payload = await res.json();
-        } catch {
-          payload = null;
-        }
 
-        if (!payload || payload.ok === false || !res.ok) {
-          const errMsg =
-            payload?.data?.errors?.join?.(', ') ||
-            payload?.data?.error ||
-            payload?.raw ||
-            'Unknown error';
+        const result = await res.json();
+
+        if (!res.ok) {
           showToast(
-            `Push failed (${payload?.status || res.status}): ${errMsg}`,
+            `Push failed: ${result?.errors || 'Unknown error'}`,
             'error',
           );
-        } else {
-          const recipients =
-            payload?.data?.recipients ??
-            payload?.data?.id ??
-            payload?.recipients;
-          const info = recipients
-            ? ` Recipients: ${recipients}`
-            : ' (no recipients)';
-          showToast(`Push queued.${info}`, 'success');
         }
       } catch (err) {
-        showToast(
-          'Push send failed: ' + (err.message || 'Unknown error'),
-          'error',
-        );
+        showToast(`Push error: ${err.message}`, 'error');
       }
 
       await chatChannel.send({
@@ -3331,18 +3312,17 @@ function initializeApp() {
 
       clearReplyTarget();
     } catch (err) {
-      logError('Send error (full object)', err);
-      showToast('Failed to send: ' + (err.message || 'Unknown error'), 'error');
+      logError('Send error', err);
+      showToast(`Failed to send: ${err.message || 'Unknown error'}`, 'error');
     } finally {
-      // clear and RESET textarea height
       messageInput.value = '';
       messageInput.style.height = 'auto';
 
       imageInput.value = '';
-
       attachedImages.forEach((i) => URL.revokeObjectURL(i.url));
       attachedImages = [];
       attachedFiles = [];
+
       renderImagePreview();
       updateSendButtonState();
       sendBtn.disabled = false;
